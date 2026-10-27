@@ -106,7 +106,7 @@ function createEngine(hooks = {}, timing = {}, config) {
   function destroy(r, why) {
     clearTimeout(r.t); clearTimeout(r.gc);
     if (rooms.get(r.code) === r) rooms.delete(r.code);
-    call('onClose', r, why);
+    call('onClose', r, why); call('onDirty');
   }
 
   // المنظّم: اللي أنشأ الطاولة من الموقع (لو طلع من اللوبي ينتقل مؤقتاً لأول لاعب)
@@ -137,7 +137,7 @@ function createEngine(hooks = {}, timing = {}, config) {
     };
   }
   function send(r) {
-    touch(r);
+    touch(r); call('onDirty');
     r.players.forEach(p => { if (!p.left && p.sid) call('push', p.sid, view(r, p)); });
   }
 
@@ -307,7 +307,11 @@ function createEngine(hooks = {}, timing = {}, config) {
     let p = r.players.find(x => x.id === pid);
     if (cfg.bannedPids.includes(pid)) throw new GameError('تم حظرك من اللعبة');
     if (p && p.kicked) throw new GameError('تم طردك من هذه الطاولة');
-    if (p) { p.sid = sid; p.left = false; p.leftAt = 0; send(r); return p; } // رجوع لنفس المقعد
+    if (p) {
+      p.sid = sid; p.left = false; p.leftAt = 0; send(r);
+      if (r.autoResume) { r.autoResume = false; setTimeout(() => { if (rooms.get(r.code) === r) admin.resume(r); }, 5000); }
+      return p;
+    } // رجوع لنفس المقعد
     if (!cfg.allowJoin) throw new GameError('الانضمام مقفل حالياً');
     if (r.phase !== 'lobby') throw new GameError('اللعبة بدأت — ما تقدر تنضم الحين');
     if (!name) throw new GameError('اكتب اسمك');
@@ -482,7 +486,34 @@ function createEngine(hooks = {}, timing = {}, config) {
     }
   };
 
-  return { rooms, createRoom, join, leave, start, act, destroy, view, hostOf, admin, cfg };
+  /* ---------- حفظ/استرجاع الطاولات عند إعادة تشغيل السيرفر ---------- */
+  const KEEP = ['code', 'meta', 'phase', 'board', 'cur', 'minRaise', 'bb', 'ticket', 'win', 'turn', 'dealer', 'msg', 'hands', 'startedAt', 'lastWinner', 'over', 'reveal', 'ranks', 'deck', 'paused'];
+  function exportRooms() {
+    return [...rooms.values()].map(r => {
+      const o = {}; KEEP.forEach(k => { o[k] = r[k]; });
+      o.players = r.players.map(p => ({ ...p, sid: null }));
+      return o;
+    });
+  }
+  function importRooms(list) {
+    let n = 0;
+    for (const o of list || []) {
+      if (!o || !o.code || rooms.has(o.code)) continue;
+      const r = {
+        ...o, players: [], t: null, gc: null, deadline: 0, paused: !!o.paused,
+        deck: o.deck || [], board: o.board || []
+      };
+      if (o.phase === 'lobby') { /* اللاعبين يرجعون تلقائياً من المتصفح */ }
+      else {
+        r.players = (o.players || []).map(p => ({ ...p, sid: null, left: true, leftAt: Date.now() }));
+        r.paused = true; r.autoResume = true; // يكمّل لما يرجع أول لاعب
+      }
+      rooms.set(r.code, r); touch(r); n++;
+    }
+    return n;
+  }
+
+  return { exportRooms, importRooms, rooms, createRoom, join, leave, start, act, destroy, view, hostOf, admin, cfg };
 }
 
 module.exports = { createEngine, GameError, ev5, best, cmp };

@@ -20,16 +20,34 @@ function logWinner(s) {
   } catch (e) { console.error('winner log failed:', e.message); }
 }
 
+const ROOMS_FILE = path.join(__dirname, 'data', 'rooms.json');
+let saveT = null;
+function saveRooms() {
+  try {
+    fs.mkdirSync(path.dirname(ROOMS_FILE), { recursive: true });
+    fs.writeFileSync(ROOMS_FILE + '.tmp', JSON.stringify(engine.exportRooms()));
+    fs.renameSync(ROOMS_FILE + '.tmp', ROOMS_FILE);
+  } catch (e) { console.error('rooms save failed:', e.message); }
+}
+function scheduleSave() { if (!saveT) saveT = setTimeout(() => { saveT = null; saveRooms(); }, 1000); }
+
 const engine = createEngine({
   push: (sid, st) => io.to(sid).emit('state', st),
   onEnd: s => { logWinner(s); if (bot) bot.onEnd(s); },
   onChange: r => { if (bot) bot.onChange(r); },
+  onDirty: () => scheduleSave(),
   onKick: (r, p, ban) => { if (p.sid) io.to(p.sid).emit('closed', ban ? 'تم حظرك من اللعبة' : 'تم طردك من الطاولة'); },
   onClose: (r, why) => {
     io.to(r.code).emit('closed', 'الطاولة انتهت' + (why === 'idle' ? ' بسبب عدم النشاط' : why === 'admin' ? ' — أغلقتها الإدارة' : ''));
     if (bot) bot.onClose(r, why);
   }
 }, {}, cfg);
+
+try {
+  const n = engine.importRooms(JSON.parse(fs.readFileSync(ROOMS_FILE, 'utf8')));
+  if (n) console.log('♻️  رجّعت ' + n + ' طاولة بعد إعادة التشغيل');
+} catch (_) { /* أول تشغيل */ }
+for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { saveRooms(); process.exit(0); });
 
 /* إعدادات الواجهة العامة (بدون أي شي سري) */
 app.get('/config.json', (q, s) => s.json({

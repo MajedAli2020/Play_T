@@ -3,8 +3,12 @@ require('dotenv').config();
 const path = require('path'), fs = require('fs'), http = require('http');
 const express = require('express'), { Server } = require('socket.io');
 const { createEngine, GameError } = require('./game');
+const CONFIG = require('./config');
+
+const ADMIN_ID = process.env.ADMIN_ID || '1241144201199226965';
 
 const PORT = process.env.PORT || 3000;
+const cfg = CONFIG.load({ baseUrl: process.env.BASE_URL, logChannelId: process.env.LOG_CHANNEL_ID });
 const app = express(), srv = http.createServer(app), io = new Server(srv);
 let bot = null;
 
@@ -20,11 +24,18 @@ const engine = createEngine({
   push: (sid, st) => io.to(sid).emit('state', st),
   onEnd: s => { logWinner(s); if (bot) bot.onEnd(s); },
   onChange: r => { if (bot) bot.onChange(r); },
+  onKick: (r, p, ban) => { if (p.sid) io.to(p.sid).emit('closed', ban ? 'تم حظرك من اللعبة' : 'تم طردك من الطاولة'); },
   onClose: (r, why) => {
-    io.to(r.code).emit('closed', 'الطاولة انتهت' + (why === 'idle' ? ' بسبب عدم النشاط' : ''));
+    io.to(r.code).emit('closed', 'الطاولة انتهت' + (why === 'idle' ? ' بسبب عدم النشاط' : why === 'admin' ? ' — أغلقتها الإدارة' : ''));
     if (bot) bot.onClose(r, why);
   }
-});
+}, {}, cfg);
+
+/* إعدادات الواجهة العامة (بدون أي شي سري) */
+app.get('/config.json', (q, s) => s.json({
+  title: cfg.title, accent: cfg.accent, defaultTicket: cfg.defaultTicket, winMult: cfg.winMult, minPlayers: cfg.minPlayers,
+  minTicket: cfg.minTicket, allowWebCreate: cfg.allowWebCreate, maintenance: cfg.maintenance, maintenanceMsg: cfg.maintenanceMsg
+}));
 
 app.disable('x-powered-by');
 app.use(express.static(path.join(__dirname, 'public')));
@@ -71,6 +82,7 @@ io.on('connection', s => {
     const name = cleanName(d.name);
     if (!name) throw new GameError('اكتب اسمك');
     const id = cleanPid(d.pid) || s.id;
+    if (!cfg.allowWebCreate) throw new GameError('إنشاء الطاولات من الموقع مقفل — استخدم /poker في ديسكورد');
     const r = engine.createRoom({ ticket: d.ticket, win: d.win, meta: { creatorName: name, hostPid: id, source: 'web' } });
     try { engine.join(r, s.id, id, name); } catch (e) { engine.destroy(r, 'error'); throw e; }
     room = r; pid = id; s.join(r.code);
@@ -89,15 +101,21 @@ io.on('connection', s => {
   });
 });
 
+/* لوحة التحكم — مربوطة بآيدي ديسكورد واحد */
+const adminPanel = require('./admin').attach({ app, io, engine, cfg, getBot: () => bot, adminId: ADMIN_ID, port: PORT });
+
 if (process.env.DISCORD_TOKEN) {
   try {
+    if (!cfg.baseUrl) cfg.baseUrl = 'http://localhost:' + PORT;
     bot = require('./bot').start({
-      engine, token: process.env.DISCORD_TOKEN,
-      baseUrl: (process.env.BASE_URL || 'http://localhost:' + PORT).replace(/\/+$/, ''),
-      logChannelId: process.env.LOG_CHANNEL_ID || '1552271543579574283',
-      guildId: process.env.GUILD_ID || ''
+      engine, cfg, token: process.env.DISCORD_TOKEN, guildId: process.env.GUILD_ID || '',
+      adminId: ADMIN_ID, issueAdminLink: adminPanel.issueLink
     });
   } catch (e) { console.error('تعذّر تشغيل البوت:', e.message); }
+} else {
+  // بدون بوت: رابط دخول محلي يظهر في الكونسول فقط
+  const l = adminPanel.issueLink(ADMIN_ID);
+  if (l) console.log('🔑 رابط دخول لوحة التحكم (صالح 5 دقائق):', l);
 }
 
 process.on('unhandledRejection', e => console.error('unhandledRejection:', e));

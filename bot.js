@@ -7,20 +7,22 @@ const {
 const fmt = n => Number(n).toLocaleString('en');
 const safe = s => escapeMarkdown(String(s)).replace(/[<>]/g, '').replace(/@/g, '@\u200b').slice(0, 40);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-const REASON = { target: 'وصل لهدف الفوز', last: 'بقي آخر لاعب معه رصيد', forfeit: 'انسحاب باقي اللاعبين' };
+const REASON = { target: 'وصل لهدف الفوز', last: 'بقي آخر لاعب معه رصيد', forfeit: 'انسحاب باقي اللاعبين', admin: 'قرار الإدارة' };
 const EPH = MessageFlags.Ephemeral;
 
-function start({ engine, token, baseUrl, logChannelId, guildId }) {
+function start({ engine, cfg, token, guildId, adminId, issueAdminLink }) {
+  const color = () => parseInt(String(cfg.embedColor || '#e7b84b').slice(1), 16);
   const client = new Client({ intents: [GatewayIntentBits.Guilds] });
   const panels = new Map(); // code -> { message, timer }
 
-  if (/localhost|127\.0\.0\.1/.test(baseUrl))
+  if (/localhost|127\.0\.0\.1/.test(cfg.baseUrl))
     console.warn('⚠️  BASE_URL يشير للجهاز المحلي — اللاعبين ما راح يقدرون يفتحون الرابط. حط رابط السيرفر العام في .env');
 
   const command = new SlashCommandBuilder()
     .setName('poker').setDescription('افتح طاولة بوكر جديدة')
     .addIntegerOption(o => o.setName('ticket').setDescription('تذكرة الدخول (رصيد كل لاعب) — الافتراضي 10000').setMinValue(20).setMaxValue(1000000000))
     .addIntegerOption(o => o.setName('win').setDescription('رصيد الفوز (يفوز أول من يوصله) — الافتراضي ثلاثة أضعاف التذكرة').setMinValue(40).setMaxValue(1000000000000));
+  const adminCommand = new SlashCommandBuilder().setName('admin').setDescription('لوحة التحكم (للمالك فقط)');
 
   /* ---------- لوحة الطاولة (الرسالة اللي فيها الأزرار) ---------- */
   function panel(room) {
@@ -29,18 +31,18 @@ function start({ engine, token, baseUrl, logChannelId, guildId }) {
     let status;
     if (!lobby) status = '🎲 اللعبة جارية — اليد رقم ' + room.hands;
     else status = (room.lastWinner ? '🏆 آخر فائز: **' + safe(room.lastWinner.name) + '**\n' : '') +
-      (names.length >= 3 ? 'جاهزين — المنظّم يضغط «ابدأ»' : 'بانتظار اللاعبين — يلزم 3 على الأقل');
-    const embed = new EmbedBuilder().setColor(0xe7b84b)
-      .setTitle('♠️ رويال بوكر — طاولة ' + room.code)
+      (names.length >= cfg.minPlayers ? 'جاهزين — المنظّم يضغط «ابدأ»' : 'بانتظار اللاعبين — يلزم ' + cfg.minPlayers + ' على الأقل');
+    const embed = new EmbedBuilder().setColor(color())
+      .setTitle(cfg.panelTitle + ' — طاولة ' + room.code)
       .setDescription(status)
       .addFields(
         { name: 'المنظّم', value: '<@' + room.meta.creatorId + '>', inline: true },
         { name: 'تذكرة الدخول', value: fmt(room.ticket), inline: true },
         { name: 'هدف الفوز', value: fmt(room.win), inline: true },
-        { name: 'اللاعبين (' + names.length + '/8)', value: names.length ? names.join('، ') : '—' }
+        { name: 'اللاعبين (' + names.length + '/' + cfg.maxPlayers + ')', value: names.length ? names.join('، ') : '—' }
       );
     const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel('🎮 ادخل الطاولة').setURL(baseUrl + '/r/' + room.code),
+      new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel('🎮 ادخل الطاولة').setURL(cfg.baseUrl + '/r/' + room.code),
       new ButtonBuilder().setCustomId('pk:start:' + room.code).setStyle(ButtonStyle.Success)
         .setLabel(lobby ? '▶️ ابدأ اللعبة' : '🎲 جارية').setDisabled(!lobby)
     );
@@ -61,8 +63,10 @@ function start({ engine, token, baseUrl, logChannelId, guildId }) {
 
   /* ---------- الأوامر والأزرار ---------- */
   async function onPoker(i) {
-    const ticket = i.options.getInteger('ticket') ?? 10000;
-    const win = i.options.getInteger('win') ?? ticket * 3;
+    if (cfg.pokerAllowedIds.length && !cfg.pokerAllowedIds.includes(i.user.id) && i.user.id !== adminId)
+      return i.reply({ content: '❌ ما عندك صلاحية تفتح طاولات.', flags: EPH });
+    const ticket = i.options.getInteger('ticket') ?? cfg.defaultTicket;
+    const win = i.options.getInteger('win') ?? Math.floor(ticket * cfg.winMult);
     let room;
     try {
       room = engine.createRoom({
@@ -83,11 +87,22 @@ function start({ engine, token, baseUrl, logChannelId, guildId }) {
     await i.update(panel(room));
   }
 
+  async function onAdmin(i) {
+    const link = issueAdminLink && issueAdminLink(i.user.id);
+    if (!link) return i.reply({ content: '🔒 هذا الأمر للمالك فقط.', flags: EPH });
+    await i.reply({
+      content: 'رابط لوحة التحكم — صالح 5 دقائق ويشتغل مرة وحدة. لا تشاركه مع أحد.',
+      components: [new ActionRowBuilder().addComponents(new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel('🛠️ افتح لوحة التحكم').setURL(link))],
+      flags: EPH
+    });
+  }
+
   client.once(Events.ClientReady, async c => {
     console.log('✅ بوت ديسكورد شغّال: ' + c.user.tag);
     try {
-      if (guildId) await c.application.commands.set([command.toJSON()], guildId);
-      else await c.application.commands.set([command.toJSON()]);
+      const cmds = [command.toJSON(), adminCommand.toJSON()];
+      if (guildId) await c.application.commands.set(cmds, guildId);
+      else await c.application.commands.set(cmds);
       console.log('✅ تم تسجيل الأمر /poker' + (guildId ? ' (سيرفر محدد)' : ' (عام — قد يتأخر حتى ساعة)'));
     } catch (e) { console.error('فشل تسجيل الأوامر:', e.message); }
   });
@@ -95,6 +110,7 @@ function start({ engine, token, baseUrl, logChannelId, guildId }) {
   client.on(Events.InteractionCreate, async i => {
     try {
       if (i.isChatInputCommand() && i.commandName === 'poker') await onPoker(i);
+      else if (i.isChatInputCommand() && i.commandName === 'admin') await onAdmin(i);
       else if (i.isButton() && i.customId.startsWith('pk:start:')) await onStart(i);
     } catch (e) {
       console.error('interaction error:', e);
@@ -110,8 +126,8 @@ function start({ engine, token, baseUrl, logChannelId, guildId }) {
   async function sendLog(s) {
     const medals = ['🥇', '🥈', '🥉'];
     const board = s.standings.slice(0, 8).map((p, k) => (medals[k] || '▫️') + ' ' + safe(p.name) + ' — ' + fmt(p.chips)).join('\n');
-    const embed = new EmbedBuilder().setColor(0xe7b84b)
-      .setTitle('🏆 نهاية مباراة بوكر')
+    const embed = new EmbedBuilder().setColor(color())
+      .setTitle(cfg.winTitle)
       .setDescription('الفائز: **' + safe(s.winner.name) + '** برصيد **' + fmt(s.winner.chips) + '**')
       .addFields(
         { name: 'الطاولة', value: s.code, inline: true },
@@ -125,7 +141,7 @@ function start({ engine, token, baseUrl, logChannelId, guildId }) {
       ).setTimestamp();
     for (let a = 1; a <= 3; a++) {
       try {
-        const ch = await client.channels.fetch(logChannelId);
+        const ch = await client.channels.fetch(cfg.logChannelId);
         if (!ch || !ch.isTextBased()) throw new Error('القناة غير صالحة أو البوت ما يشوفها');
         await ch.send({ embeds: [embed], allowedMentions: { parse: [] } });
         return;
@@ -136,9 +152,17 @@ function start({ engine, token, baseUrl, logChannelId, guildId }) {
     }
   }
 
+  async function say(text) {
+    const ch = await client.channels.fetch(cfg.logChannelId).catch(() => null);
+    if (!ch || !ch.isTextBased()) throw new Error('روم اللوق غير صالح أو البوت ما يشوفه');
+    await ch.send({ content: text, allowedMentions: { parse: [] } });
+  }
+
   client.login(token).catch(e => console.error('فشل تسجيل دخول البوت:', e.message));
 
   return {
+    say,
+    status: () => ({ ready: client.isReady(), tag: client.user ? client.user.tag : null, guilds: client.guilds.cache.size, ping: client.ws.ping }),
     onEnd: s => { sendLog(s).catch(e => console.error('sendLog:', e)); },
     onChange: room => refresh(room),
     onClose: (room, why) => {

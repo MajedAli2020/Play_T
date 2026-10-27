@@ -36,6 +36,7 @@ button{font-family:inherit;cursor:pointer}
 .c{width:36px;height:50px;border-radius:5px;background:#fbfaf5;color:#111;display:flex;flex-direction:column;padding:2px 4px;font-weight:800;line-height:1;box-shadow:0 2px 5px #0008}
 .c b{font-size:.95rem}.c i{font-style:normal;font-size:1.25rem}
 .c.r{color:#c8141e}
+svg.c{display:block;padding:0;background:none;box-shadow:0 2px 5px #0008;border-radius:5px;overflow:visible}
 .c.b{background:#d9c58f;border:2px solid #f3ead0;background-image:repeating-linear-gradient(45deg,#b8944a 0 2px,transparent 2px 8px),repeating-linear-gradient(-45deg,#b8944a 0 2px,transparent 2px 8px)}
 .c.e{background:#0002;border:1px dashed #6b4a1e99;box-shadow:none}
 .seat{position:absolute;width:104px;display:flex;flex-direction:column;align-items:center;gap:3px;z-index:3}
@@ -71,7 +72,7 @@ button{font-family:inherit;cursor:pointer}
 @keyframes glow{50%{box-shadow:inset 0 1px 0 #fff9,0 0 24px var(--gold2),0 3px 0 #0009}}
 @media(prefers-reduced-motion:reduce){#bar.on #allin{animation:none}}
 </style></head><body>
-<div id="net" hidden></div><div id="home" class="box"><h1>رويال بوكر</h1>
+<div id="net" hidden></div><div id="home" class="box"><h1 id="ttl">رويال بوكر</h1><div id="mt" hidden style="background:#8a1020;border-radius:10px;padding:8px;text-align:center;font-weight:800"></div>
 <label>اسمك<input id="nm" maxlength="14" placeholder="مثال: أبو فهد"></label>
 <div id="cf" style="display:grid;gap:12px"><label>تذكرة الدخول (رصيد كل لاعب)<input id="ch" type="number" value="10000" min="20"></label><label>الفوز (يفوز أول من يوصل له)<input id="wn" type="number" value="30000"></label>
 <button id="create" class="btn gold">إنشاء طاولة جديدة</button><div style="color:#cdbf94;text-align:center;font-size:.85rem">— أو ادخل طاولة موجودة —</div></div>
@@ -96,7 +97,25 @@ button{font-family:inherit;cursor:pointer}
 const $=id=>document.getElementById(id),sock=typeof io==='undefined'?{on(){},emit(){},connected:false}:io(),S=['♠','♥','♦','♣'],R={11:'J',12:'Q',13:'K',14:'A'};
 let st=null,dl=0,mine=false;
 const fmt=n=>Number(n).toLocaleString('en'),esc=t=>String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const card=c=>c===0?'<div class="c b"></div>':`<div class="c ${c.s==1||c.s==2?'r':''}"><b>${R[c.r]||c.r}</b><i>${S[c.s]}</i></div>`;
+const SC=['#111','#c8141e','#c8141e','#111'],LBL={14:'A',13:'K',12:'Q',11:'J'};
+const PIPS={7:[[21,22],[39,22],[21,42],[39,42],[21,62],[39,62],[30,32]],8:[[21,22],[39,22],[21,42],[39,42],[21,62],[39,62],[30,32],[30,52]],
+ 9:[[21,21],[39,21],[21,35],[39,35],[21,49],[39,49],[21,63],[39,63],[30,42]],10:[[21,21],[39,21],[21,35],[39,35],[21,49],[39,49],[21,63],[39,63],[30,28],[30,56]]};
+const ROBE={13:'#c8141e',12:'#1f3a93',11:'#d9a21b'};
+function court(r,col){
+ const robe=ROBE[r],hat=r===13?`<path d="M25 20 L26 13.5 L28.5 17.5 L30 12.5 L31.5 17.5 L34 13.5 L35 20Z" fill="#e8b830" stroke="#5a3a00" stroke-width=".5"/>`:
+  r===12?`<path d="M25 20 L26 15 L28.5 18 L30 14 L31.5 18 L34 15 L35 20Z" fill="#e8b830" stroke="#5a3a00" stroke-width=".5"/><circle cx="30" cy="12.5" r="1.8" fill="#c8141e"/>`:
+  `<path d="M24.5 21 Q30 10 36 21Z" fill="#1f3a93" stroke="#111" stroke-width=".5"/><path d="M33 14 Q40 9 41 17" fill="none" stroke="#c8141e" stroke-width="1.4"/>`;
+ const half=`<path d="M18 42 L22 31 Q30 26 38 31 L42 42Z" fill="${robe}" stroke="#222" stroke-width=".5"/><path d="M30 28 L30 42" stroke="#fff8" stroke-width="1"/><circle cx="30" cy="24" r="5" fill="#f2c9a0" stroke="#333" stroke-width=".5"/>${hat}`;
+ return `<rect x="17" y="13" width="26" height="58" rx="2" fill="#fff4d6" stroke="${col}" stroke-width="1"/><g>${half}</g><g transform="rotate(180 30 42)">${half}</g><line x1="17" y1="42" x2="43" y2="42" stroke="${col}" stroke-width=".6"/>`}
+const card=c=>{
+ if(c===0)return'<div class="c b"></div>';
+ const col=SC[c.s],su=S[c.s],lb=LBL[c.r]||c.r,fs=lb==='10'?12:15;
+ const idx=`<text x="9" y="16" font-size="${fs}" font-weight="800" fill="${col}" text-anchor="middle" dominant-baseline="central" font-family="Arial,sans-serif">${lb}</text><text x="9" y="29" font-size="12" fill="${col}" text-anchor="middle" dominant-baseline="central">${su}</text>`;
+ let body;
+ if(c.r===14)body=`<text x="30" y="43" font-size="38" fill="${col}" text-anchor="middle" dominant-baseline="central">${su}</text>`;
+ else if(PIPS[c.r])body=PIPS[c.r].map(([x,y])=>`<text x="${x}" y="${y}" font-size="12" fill="${col}" text-anchor="middle" dominant-baseline="central"${y>42?` transform="rotate(180 ${x} ${y})"`:''}>${su}</text>`).join('');
+ else body=court(c.r,col);
+ return `<svg class="c cd" viewBox="0 0 60 84" xmlns="http://www.w3.org/2000/svg"><rect x=".5" y=".5" width="59" height="83" rx="5" fill="#fbfaf5" stroke="#bdb59c" stroke-width="1"/>${idx}<g transform="rotate(180 30 42)">${idx}</g>${body}</svg>`};
 const coin='<span class="coin">♣</span>',hue=t=>[...t].reduce((a,c)=>a*31+c.charCodeAt(0),7)%360;
 const ls={get:k=>{try{return localStorage.getItem(k)}catch(e){return null}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}},del:k=>{try{localStorage.removeItem(k)}catch(e){}}};
 let pid=ls.get('rp_pid');if(!pid){pid=(crypto.randomUUID?crypto.randomUUID():Math.random().toString(36).slice(2)+Date.now().toString(36)+Math.random().toString(36).slice(2));ls.set('rp_pid',pid)}
@@ -114,6 +133,14 @@ $('fold').onclick=()=>act('fold');$('allin').onclick=()=>act('allin');
 const setR=v=>{v=Math.max(+$('rs').min,Math.min(+$('rs').max,Math.round(v)));$('rs').value=v;$('raise').textContent='رفع إلى '+fmt(v)};$('rs').oninput=()=>setR(+$('rs').value);
 document.querySelectorAll('.pre button').forEach(b=>b.onclick=()=>{const p=b.dataset.p,mn=+$('rs').min,mx=+$('rs').max;setR(p==='min'?mn:p==='max'?mx:st.cur+st.pot*p)});
 $('raise').onclick=()=>act('raise',+$('rs').value);
+fetch('/config.json').then(r=>r.json()).then(c=>{
+ document.title=c.title;$('ttl').textContent=c.title;
+ document.documentElement.style.setProperty('--gold',c.accent);
+ if(!m){$('ch').value=c.defaultTicket;$('wn').value=Math.floor(c.defaultTicket*c.winMult);$('ch').min=c.minTicket;
+  $('ch').oninput=()=>{$('wn').value=Math.floor(+$('ch').value*c.winMult)}}
+ if(!c.allowWebCreate){$('cf').hidden=true}
+ if(c.maintenance){$('mt').textContent=c.maintenanceMsg;$('mt').hidden=false}
+}).catch(()=>{});
 const net=m=>{$('net').textContent=m;$('net').hidden=false};
 const OFF='ما قدرت أتصل بالسيرفر. تأكد إن السيرفر شغّال وافتح الموقع من الرابط (مو من الملف مباشرة).';
 if(typeof io==='undefined')net(OFF);
@@ -127,8 +154,8 @@ function render(){
  const me=st.players.find(p=>p.id===st.me);
  if(lobby){$('lc').textContent=st.code;$('lt').textContent='تذكرة الدخول '+fmt(st.ticket)+' • الفوز '+fmt(st.win);$('link').value=location.origin+'/r/'+st.code;
   $('plist').innerHTML=st.players.map(p=>`<div class="pl"><span class="av" style="width:36px;height:36px;font-size:1.1rem;background:hsl(${hue(p.name)},35%,20%)">${esc([...p.name][0])}</span>${esc(p.name)}${p.id===st.host?' 👑':''}<span class="mn">${fmt(p.chips)}</span></div>`).join('');
-  const cnt=st.players.filter(p=>p.chips>0).length,ok=cnt>=3,isH=!!st.host&&st.host===st.me;
-  $('lmsg').textContent=st.msg||(ok?(isH?'جاهزين — اضغط ابدأ اللعب':(st.host?'جاهزين — بانتظار المنظّم يبدأ اللعبة':'جاهزين — بانتظار المنظّم'+(st.by?' ('+st.by+')':'')+' يبدأ اللعبة من ديسكورد')):'نحتاج 3 لاعبين على الأقل ('+cnt+'/3) — أرسل الرابط لخواتك');
+  const cnt=st.players.filter(p=>p.chips>0).length,ok=cnt>=st.minp,isH=!!st.host&&st.host===st.me;
+  $('lmsg').textContent=st.msg||(ok?(isH?'جاهزين — اضغط ابدأ اللعب':(st.host?'جاهزين — بانتظار المنظّم يبدأ اللعبة':'جاهزين — بانتظار المنظّم'+(st.by?' ('+st.by+')':'')+' يبدأ اللعبة من ديسكورد')):'نحتاج '+st.minp+' لاعبين على الأقل ('+cnt+'/'+st.minp+') — أرسل الرابط لخواتك');
   $('start').hidden=!isH;$('start').style.opacity=ok?1:.6;return}
  const n=st.players.length,mi=st.players.indexOf(me);let h='';
  st.players.forEach((p,i)=>{const k=(i-mi+n)%n,a=Math.PI/2+k*2*Math.PI/n,x=50+36*Math.cos(a),y=k?52+33*Math.sin(a):98,t=p.id===st.turn,pc=Math.min(100,Math.round(p.chips/st.win*100));
@@ -142,7 +169,7 @@ function render(){
  $('seats').innerHTML=h;
  $('board').innerHTML=[0,1,2,3,4].map(i=>st.board[i]?card(st.board[i]):'<div class="c e"></div>').join('');
  $('pot').innerHTML=coin+'البوت '+fmt(st.pot);$('msg').textContent=st.msg;
- $('rules').innerHTML=`تذكرة الدخول<div class="pill">${fmt(st.ticket)}${coin}</div>الفوز<div class="pill w">${fmt(st.win)}${coin}</div><span style="color:#cdbf94">طاولة ${st.code}</span>`;
+ $('rules').innerHTML=`تذكرة الدخول<div class="pill">${fmt(st.ticket)}${coin}</div>الفوز<div class="pill w">${fmt(st.win)}${coin}</div><span style="color:#cdbf94">طاولة ${st.code}</span>${st.rk&&st.rk.length?`<div style="color:#cdbf94;margin-top:3px;font-size:.72rem">الورق: ${st.rk.map(r=>R[r]||r).join(' ')}</div>`:''}`;
  $('hp').hidden=!st.mh;$('hp').firstChild&&0;$('hp').textContent=st.mh||'';
  mine=st.turn===st.me&&!!me;$('bar').className=mine?'on':'';
  if(!mine){$('rg').className='';$('call').textContent='مساومة';return}

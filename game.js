@@ -1,8 +1,8 @@
 'use strict';
 // محرك اللعبة (منطق البوكر فقط) — ما فيه سوكت ولا ديسكورد، عشان يكون سهل الاختبار.
 const { randomInt } = require('crypto');
+const CONFIG = require('./config');
 
-const MAX = 8;
 const HN = ['ورقة عالية', 'زوج', 'زوجين', 'ثلاثة متشابهة', 'تسلسل', 'فلاش', 'فل هاوس', 'أربعة متشابهة', 'ستريت فلاش'];
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
@@ -17,9 +17,12 @@ const cmp = (a, b) => {
   return 0;
 };
 
-function newDeck() {
+// الورق: أكه شايب بنت ولد عشرة تسعة ثمانية سبعة (حسب عدد اللاعبين)
+const RANKS_ALL = [14, 13, 12, 11, 10, 9, 8, 7];
+
+function newDeck(ranks = RANKS_ALL) {
   const d = [];
-  for (let s = 0; s < 4; s++) for (let r = 2; r <= 14; r++) d.push({ r, s });
+  for (let s = 0; s < 4; s++) for (const r of ranks) d.push({ r, s });
   for (let i = d.length - 1; i > 0; i--) { const j = randomInt(i + 1); [d[i], d[j]] = [d[j], d[i]]; }
   return d;
 }
@@ -58,7 +61,7 @@ function best(c) {
   return b;
 }
 
-function myHand(r, p) {
+function myHand(r, p, HN) {
   const c = [...p.hand, ...r.board];
   if (c.length < 5) return p.hand[0].r === p.hand[1].r ? HN[1] : HN[0];
   let b = null;
@@ -73,8 +76,18 @@ function myHand(r, p) {
 }
 
 /* ---------- المحرك ---------- */
-function createEngine(hooks = {}, timing = {}) {
-  const T = { turn: 10000, next: 6500, end: 9000, grace: 60000, idle: 30 * 60000, ...timing };
+function createEngine(hooks = {}, timing = {}, config) {
+  const cfg = config || CONFIG.defaults();
+  // التوقيت يُقرأ من الإعدادات الحيّة كل مرة (timing للاختبارات فقط)
+  const T = {
+    get turn() { return timing.turn ?? cfg.turnSec * 1000; },
+    get next() { return timing.next ?? cfg.nextSec * 1000; },
+    get end() { return timing.end ?? cfg.endSec * 1000; },
+    get grace() { return timing.grace ?? cfg.graceSec * 1000; },
+    get idle() { return timing.idle ?? cfg.idleMin * 60000; }
+  };
+  const HNs = () => (Array.isArray(cfg.handNames) && cfg.handNames.length === 9 ? cfg.handNames : HN);
+  const calcBB = ticket => Math.max(2, Math.round(ticket / cfg.bbDivisor) * 2);
   const rooms = new Map();
   const call = (name, ...a) => { try { if (hooks[name]) hooks[name](...a); } catch (e) { console.error('hook ' + name + ':', e); } };
 
@@ -110,15 +123,15 @@ function createEngine(hooks = {}, timing = {}) {
       ticket: r.ticket, win: r.win, board: r.board, cur: r.cur, minRaise: r.minRaise,
       pot: r.players.reduce((s, p) => s + p.tot, 0),
       turn: r.players[r.turn] ? r.players[r.turn].id : undefined,
-      left: Math.max(0, r.deadline - Date.now()), msg: r.msg,
-      mh: (me.in && me.hand.length && r.phase !== 'lobby') ? myHand(r, me) : '',
+      left: r.paused ? 0 : Math.max(0, r.deadline - Date.now()), msg: r.paused ? '⏸ الطاولة متوقفة مؤقتاً من الإدارة' : r.msg,
+      mh: (me.in && me.hand.length && r.phase !== 'lobby') ? myHand(r, me, HNs()) : '', minp: cfg.minPlayers, rk: r.ranks || [], paused: !!r.paused,
       players: r.players.map((p, i) => {
         const show = p === me || (sd && p.in && !p.folded);
         return {
           id: p.id, name: p.name, chips: p.chips, bet: p.bet, folded: p.folded, allin: p.allin, in: p.in,
           dealer: i === r.dealer, win: p.win || 0,
           hand: p.hand.length ? (show ? p.hand : [0, 0]) : [],
-          hn: (sd && p.in && !p.folded && p.score) ? HN[p.score[0]] : ''
+          hn: (sd && p.in && !p.folded && p.score) ? HNs()[p.score[0]] : ''
         };
       })
     };
@@ -175,11 +188,15 @@ function createEngine(hooks = {}, timing = {}) {
       return toLobby(r, w ? 'انتهت المباراة — 🏆 ' + w.name + ' فاز' : 'انتهت المباراة');
     }
     r.hands = (r.hands || 0) + 1;
-    r.deck = newDeck(); r.board = []; r.msg = ''; r.reveal = false;
+    // عدد رتب الورق = عدد اللاعبين (٤ → أكه شايب بنت ولد، ٥ تزيد العشرة، … ٨ → لين السبعة)
+    let k = cfg.deckByPlayers ? Math.min(cfg.maxRanks, Math.max(cfg.minRanks, n)) : cfg.maxRanks;
+    while (4 * k < 2 * n + 5 && k < 8) k++;
+    r.ranks = RANKS_ALL.slice(0, k);
+    r.deck = newDeck(r.ranks); r.board = []; r.msg = ''; r.reveal = false;
     r.dealer = nxt(r, r.dealer, p => p.in);
     const sb = n === 2 ? r.dealer : nxt(r, r.dealer, p => p.in), bbI = nxt(r, sb, p => p.in);
     r.players.forEach(p => { if (p.in) p.hand = [r.deck.pop(), r.deck.pop()]; });
-    pay(r.players[sb], Math.floor(r.bb / 2)); pay(r.players[bbI], r.bb);
+    pay(r.players[sb], Math.max(1, Math.floor(r.bb * cfg.sbRatio))); pay(r.players[bbI], r.bb);
     r.cur = r.bb; r.minRaise = r.bb; r.phase = 'preflop'; r.turn = bbI;
     step(r);
   }
@@ -211,7 +228,7 @@ function createEngine(hooks = {}, timing = {}) {
   }
 
   function act0(r, p, type, amt) {
-    if (r.players[r.turn] !== p || !['preflop', 'flop', 'turn', 'river'].includes(r.phase)) return;
+    if (r.paused || r.players[r.turn] !== p || !['preflop', 'flop', 'turn', 'river'].includes(r.phase)) return;
     const to = r.cur - p.bet;
     if (type === 'fold') p.folded = true;
     else if (type === 'check' || type === 'call') pay(p, to);
@@ -253,7 +270,7 @@ function createEngine(hooks = {}, timing = {}) {
       prev = l;
     });
     const ws = all.filter(p => p.win > 0);
-    r.msg = ws.map(p => p.name + ' فاز بـ ' + p.win.toLocaleString('en') + (fold ? '' : ' (' + HN[p.score[0]] + ')')).join(' • ');
+    r.msg = ws.map(p => p.name + ' فاز بـ ' + p.win.toLocaleString('en') + (fold ? '' : ' (' + HNs()[p.score[0]] + ')')).join(' • ');
     const champ = r.players.filter(p => p.chips >= r.win).sort((a, b) => b.chips - a.chips)[0];
     r.reveal = !fold; r.phase = 'showdown'; r.turn = -1; r.deadline = 0;
     if (champ) {
@@ -270,15 +287,16 @@ function createEngine(hooks = {}, timing = {}) {
   /* ---------- واجهة المحرك ---------- */
   function createRoom({ ticket, win, meta } = {}) {
     ticket = Math.floor(+ticket); win = Math.floor(+win);
-    if (!(ticket >= 20 && ticket <= 1e9)) throw new GameError('تذكرة الدخول لازم تكون من 20 إلى 1,000,000,000');
-    if (!(win > ticket && win <= 1e12)) throw new GameError('رصيد الفوز لازم يكون أكبر من تذكرة الدخول');
-    if (rooms.size >= 200) throw new GameError('فيه طاولات كثيرة الحين، جرّب بعد شوي');
+    if (cfg.maintenance && !(meta && meta.admin)) throw new GameError(cfg.maintenanceMsg || 'اللعبة تحت الصيانة');
+    if (!(ticket >= cfg.minTicket && ticket <= cfg.maxTicket)) throw new GameError('تذكرة الدخول لازم تكون من ' + cfg.minTicket.toLocaleString('en') + ' إلى ' + cfg.maxTicket.toLocaleString('en'));
+    if (!(win > ticket && win <= cfg.maxWin)) throw new GameError('رصيد الفوز لازم يكون أكبر من تذكرة الدخول' + (win > cfg.maxWin ? ' وأقل من ' + cfg.maxWin.toLocaleString('en') : ''));
+    if (rooms.size >= cfg.maxRooms) throw new GameError('فيه طاولات كثيرة الحين، جرّب بعد شوي');
     let code;
     do { code = Array.from({ length: 4 }, () => CODE_CHARS[randomInt(CODE_CHARS.length)]).join(''); } while (rooms.has(code));
     const r = {
       code, meta: meta || {}, players: [], phase: 'lobby', board: [], cur: 0, minRaise: 0,
-      bb: Math.max(2, Math.round(ticket / 200) * 2), ticket, win, turn: -1, dealer: -1, deadline: 0,
-      msg: '', t: null, gc: null, hands: 0, startedAt: 0, lastWinner: null, over: false, reveal: false
+      bb: calcBB(ticket), ticket, win, turn: -1, dealer: -1, deadline: 0,
+      msg: '', ranks: RANKS_ALL.slice(), paused: false, t: null, gc: null, hands: 0, startedAt: 0, lastWinner: null, over: false, reveal: false
     };
     rooms.set(code, r);
     touch(r);
@@ -287,10 +305,14 @@ function createEngine(hooks = {}, timing = {}) {
 
   function join(r, sid, pid, name) {
     let p = r.players.find(x => x.id === pid);
+    if (cfg.bannedPids.includes(pid)) throw new GameError('تم حظرك من اللعبة');
+    if (p && p.kicked) throw new GameError('تم طردك من هذه الطاولة');
     if (p) { p.sid = sid; p.left = false; p.leftAt = 0; send(r); return p; } // رجوع لنفس المقعد
+    if (!cfg.allowJoin) throw new GameError('الانضمام مقفل حالياً');
     if (r.phase !== 'lobby') throw new GameError('اللعبة بدأت — ما تقدر تنضم الحين');
     if (!name) throw new GameError('اكتب اسمك');
-    if (r.players.length >= MAX) throw new GameError('الطاولة ممتلئة (الحد ' + MAX + ')');
+    if (cfg.bannedNames.some(b => b.toLowerCase() === name.toLowerCase())) throw new GameError('هذا الاسم ممنوع');
+    if (r.players.length >= cfg.maxPlayers) throw new GameError('الطاولة ممتلئة (الحد ' + cfg.maxPlayers + ')');
     p = mkP(pid, sid, name, r.ticket);
     r.players.push(p);
     send(r); changed(r);
@@ -305,9 +327,10 @@ function createEngine(hooks = {}, timing = {}) {
     send(r);
   }
 
-  function start(r) {
+  function start(r, force) {
     if (r.phase !== 'lobby') throw new GameError('اللعبة جارية');
-    if (r.players.filter(p => p.chips > 0).length < 3) throw new GameError('لازم 3 لاعبين على الأقل');
+    const need = force ? 2 : cfg.minPlayers;
+    if (r.players.filter(p => p.chips > 0).length < need) throw new GameError('لازم ' + need + ' لاعبين على الأقل');
     r.startedAt = Date.now(); r.hands = 0; r.lastWinner = null;
     startHand(r);
     changed(r);
@@ -318,7 +341,148 @@ function createEngine(hooks = {}, timing = {}) {
     if (p && !p.left) act0(r, p, type, amount);
   }
 
-  return { rooms, createRoom, join, leave, start, act, destroy, view, hostOf };
+  /* ---------- أدوات الإدارة (لوحة التحكم فقط) ---------- */
+  const betting = r => ['preflop', 'flop', 'turn', 'river'].includes(r.phase);
+  const P = (r, pid) => { const p = r.players.find(x => x.id === pid); if (!p) throw new GameError('اللاعب غير موجود'); return p; };
+  const cardOk = (c, r) => c && (r.ranks || RANKS_ALL).includes(c.r) && Number.isInteger(c.s) && c.s >= 0 && c.s <= 3;
+  const key = c => c.r * 4 + c.s;
+
+  const admin = {
+    // كل شي عن الطاولة بما فيها أوراق اللاعبين
+    snapshot(r) {
+      return {
+        code: r.code, ranks: r.ranks || [], phase: r.phase, paused: !!r.paused, ticket: r.ticket, win: r.win, bb: r.bb, cur: r.cur, minRaise: r.minRaise,
+        pot: r.players.reduce((s, p) => s + p.tot, 0), board: r.board, msg: r.msg, hands: r.hands, dealer: r.dealer,
+        turn: r.players[r.turn] ? r.players[r.turn].id : null, left: Math.max(0, r.deadline - Date.now()),
+        host: hostOf(r), by: (r.meta && (r.meta.creatorName || r.meta.creatorId)) || '', source: (r.meta && r.meta.source) || (r.meta && r.meta.creatorId ? 'discord' : ''),
+        startedAt: r.startedAt, lastWinner: r.lastWinner,
+        players: r.players.map((p, i) => ({
+          id: p.id, name: p.name, chips: p.chips, bet: p.bet, tot: p.tot, in: p.in, folded: p.folded, allin: p.allin,
+          left: p.left, hand: p.hand, dealer: i === r.dealer, online: !p.left
+        }))
+      };
+    },
+    settings(r, o = {}) {
+      if (o.ticket !== undefined) {
+        const t = Math.floor(+o.ticket);
+        if (!(t >= 1 && t <= 1e12)) throw new GameError('تذكرة غير صالحة');
+        r.ticket = t;
+        if (r.phase === 'lobby') r.players.forEach(p => { p.chips = t; });
+        if (o.bb === undefined) r.bb = calcBB(t);
+      }
+      if (o.win !== undefined) {
+        const w = Math.floor(+o.win);
+        if (!(w > 0 && w <= 1e13)) throw new GameError('رصيد فوز غير صالح');
+        r.win = w;
+      }
+      if (o.bb !== undefined) {
+        const b = Math.floor(+o.bb);
+        if (!(b >= 2 && b <= 1e12)) throw new GameError('بلايند غير صالح');
+        r.bb = b; // يسري من اليد الجاية
+      }
+      send(r); changed(r);
+    },
+    message(r, text) { r.msg = String(text || '').slice(0, 140); send(r); },
+    rename(r, pid, name) {
+      name = String(name || '').trim().slice(0, 14);
+      if (!name) throw new GameError('اسم فاضي');
+      P(r, pid).name = name; send(r); changed(r);
+    },
+    setHost(r, pid) { P(r, pid); r.meta = r.meta || {}; r.meta.hostPid = pid; send(r); changed(r); },
+    setChips(r, pid, n) {
+      n = Math.floor(+n);
+      if (!(n >= 0 && n <= 1e13)) throw new GameError('رصيد غير صالح');
+      const p = P(r, pid);
+      p.chips = n;
+      if (p.in && !p.folded && betting(r)) p.allin = n === 0;
+      send(r);
+    },
+    kick(r, pid, ban) {
+      const p = P(r, pid);
+      if (ban) { if (!cfg.bannedPids.includes(pid)) cfg.bannedPids.push(pid); CONFIG.save(cfg); }
+      call('onKick', r, p, !!ban);
+      if (r.phase === 'lobby') { r.players = r.players.filter(x => x !== p); send(r); changed(r); return; }
+      const wasTurn = betting(r) && r.players[r.turn] === p;
+      p.left = true; p.kicked = true; p.leftAt = 0; p.sid = null; // يتشال في اليد الجاية
+      if (betting(r) && p.in && !p.folded) {
+        if (wasTurn) act0(r, p, 'fold');
+        else { p.folded = true; if (live(r).length === 1) step(r); else send(r); }
+      } else send(r);
+    },
+    act(r, pid, type, amt) {
+      const p = P(r, pid);
+      if (!betting(r) || r.players[r.turn] !== p) throw new GameError('مو دور هذا اللاعب');
+      if (r.paused) throw new GameError('الطاولة متوقفة');
+      act0(r, p, type, amt);
+    },
+    skipTurn(r) {
+      if (!betting(r) || r.turn < 0) throw new GameError('ما فيه دور حالياً');
+      const p = r.players[r.turn];
+      act0(r, p, p.bet < r.cur ? 'fold' : 'check');
+    },
+    addTime(r, sec) {
+      if (!betting(r) || r.turn < 0) throw new GameError('ما فيه دور حالياً');
+      const p = r.players[r.turn], ms = Math.max(1, Math.min(600, +sec || 10)) * 1000;
+      clearTimeout(r.t);
+      r.deadline = Date.now() + ms;
+      r.t = setTimeout(() => { if (r.players[r.turn] === p) act0(r, p, p.bet < r.cur ? 'fold' : 'check'); }, ms + 200);
+      send(r);
+    },
+    pause(r) {
+      if (r.paused) return;
+      r.paused = true; clearTimeout(r.t); send(r);
+    },
+    resume(r) {
+      if (!r.paused) return;
+      r.paused = false;
+      if (betting(r) && r.turn >= 0) turnStart(r);
+      else if (r.phase === 'showdown') r.t = setTimeout(() => (r.over ? toLobby(r, '') : startHand(r)), T.next);
+      else send(r);
+    },
+    forceStart(r) { start(r, true); },
+    nextHand(r) {
+      if (r.phase !== 'showdown' || r.over) throw new GameError('تقدر تتخطى فقط بعد انتهاء اليد');
+      startHand(r);
+    },
+    toLobby(r, msg) { r.paused = false; toLobby(r, msg || 'رجّعت الإدارة الطاولة للوبي'); },
+    declareWinner(r, pid) {
+      const p = P(r, pid);
+      r.paused = false;
+      endMatch(r, p, 'admin');
+      toLobby(r, '🏆 ' + p.name + ' فاز بقرار الإدارة');
+    },
+    close(r, why) { destroy(r, why || 'admin'); },
+    // تغيير أوراق لاعب أو أوراق الطاولة (بنفس العدد الحالي)
+    setCards(r, { pid, hand, board }) {
+      if (!betting(r) && r.phase !== 'showdown') throw new GameError('الأوراق ما تتغير إلا أثناء اليد');
+      const inUse = new Set();
+      r.players.forEach(p => { if (!(hand && p.id === pid)) p.hand.forEach(c => inUse.add(key(c))); });
+      if (!board) r.board.forEach(c => inUse.add(key(c)));
+      let target;
+      if (hand) {
+        const p = P(r, pid);
+        if (!p.hand.length || hand.length !== 2) throw new GameError('لازم ورقتين لهذا اللاعب');
+        target = p.hand; if (!hand.every(c => cardOk(c, r))) throw new GameError('ورقة غير صالحة');
+      } else if (board) {
+        if (board.length !== r.board.length || !board.every(c => cardOk(c, r))) throw new GameError('لازم ' + r.board.length + ' أوراق للطاولة');
+        target = r.board;
+      } else throw new GameError('ما فيه أوراق');
+      const nw = hand || board;
+      if (new Set(nw.map(key)).size !== nw.length) throw new GameError('ورقة مكررة');
+      if (nw.some(c => inUse.has(key(c)))) throw new GameError('إحدى الأوراق مستخدمة عند لاعب أو في الطاولة');
+      const old = target.map(c => ({ r: c.r, s: c.s }));
+      target.splice(0, target.length, ...nw.map(c => ({ r: c.r, s: c.s })));
+      // رجّع القديمة للمجموعة وشيل الجديدة منها
+      const gone = new Set(nw.map(key));
+      r.deck = (r.deck || []).filter(c => !gone.has(key(c)));
+      old.forEach(c => { if (!gone.has(key(c))) r.deck.unshift(c); });
+      // أعد تقييم الشوداون لو انكشفت الأوراق
+      if (r.phase === 'showdown' && r.reveal) live(r).forEach(p => { p.score = best([...p.hand, ...r.board]); });
+      send(r);
+    }
+  };
+
+  return { rooms, createRoom, join, leave, start, act, destroy, view, hostOf, admin, cfg };
 }
 
 module.exports = { createEngine, GameError, ev5, best, cmp };

@@ -1,0 +1,281 @@
+<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>لوحة التحكم</title>
+<meta name="robots" content="noindex">
+<style>
+:root{--bg:#0e1122;--panel:#1a1f36;--panel2:#141830;--line:#2e3558;--gold:#e7b84b;--gold2:#ffe08a;--txt:#eef0fa;--mut:#9aa3c7;--ok:#2fae4d;--bad:#d2384a;--info:#4d7be0}
+*{box-sizing:border-box;margin:0;font-family:Tahoma,"Segoe UI",sans-serif}
+body{background:var(--bg);color:var(--txt);min-height:100vh}
+button,input,select,textarea{font:inherit;color:inherit}
+header{display:flex;align-items:center;gap:12px;padding:12px 18px;background:var(--panel);border-bottom:2px solid var(--gold);position:sticky;top:0;z-index:20;flex-wrap:wrap}
+header h1{font-size:1.15rem;color:var(--gold2)}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--bad)}.dot.on{background:var(--ok)}
+nav{display:flex;gap:6px;margin-inline-start:auto;flex-wrap:wrap}
+nav button{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:7px 14px;cursor:pointer}
+nav button.act{background:var(--gold);color:#2a1a00;font-weight:800;border-color:var(--gold)}
+main{padding:16px;max-width:1400px;margin:0 auto}
+.tab{display:none}.tab.act{display:block}
+.btn{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:6px 12px;cursor:pointer;font-size:.88rem}
+.btn:hover{border-color:var(--gold)}.btn.g{background:var(--gold);color:#2a1a00;border-color:var(--gold);font-weight:800}
+.btn.r{background:#4a1520;border-color:#8a2335}.btn.b{background:#1d3366;border-color:#335bb0}.btn.k{background:#144a2a;border-color:#23804a}
+.btn.sm{padding:3px 8px;font-size:.78rem}
+input,select,textarea{background:#0b0e1d;border:1px solid var(--line);border-radius:8px;padding:6px 9px;width:100%}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--gold)}
+input[type=checkbox]{width:auto;accent-color:var(--gold);transform:scale(1.25)}
+input[type=color]{padding:0;height:34px;width:70px}
+.grid{display:grid;grid-template-columns:320px 1fr;gap:14px;align-items:start}
+@media(max-width:900px){.grid{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px}
+.card h2{font-size:1rem;color:var(--gold2);margin-bottom:10px}
+.rooms{display:grid;gap:8px}
+.room{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:9px 11px;cursor:pointer;display:grid;gap:3px}
+.room.sel{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold)}
+.room b{font-size:1.05rem;letter-spacing:2px}.mut{color:var(--mut);font-size:.8rem}
+.tag{display:inline-block;padding:1px 8px;border-radius:8px;font-size:.72rem;font-weight:800;background:#2a3050}
+.tag.lobby{background:#33406e}.tag.live{background:#144a2a}.tag.show{background:#5a4510}.tag.pause{background:#6a2a10}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.row.sp{justify-content:space-between}
+.bar{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}
+table{width:100%;border-collapse:collapse;font-size:.88rem}
+th,td{padding:7px 6px;border-bottom:1px solid var(--line);text-align:right;vertical-align:middle}
+th{color:var(--mut);font-weight:500;font-size:.78rem}
+tr.turn td{background:#3a2d0f}tr.out td{opacity:.5}
+td .acts{display:flex;gap:4px;flex-wrap:wrap}
+.pc{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;width:34px;height:46px;background:#fbfaf5;color:#111;border-radius:5px;font-weight:800;font-size:.95rem;line-height:1.05;margin-inline-end:3px}
+.pc.r{color:#c8141e}.pc.e{background:#0003;border:1px dashed var(--line);color:var(--mut)}
+.cards{display:flex;direction:ltr;justify-content:flex-end}
+.kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:10px}
+.kv div{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:8px 10px}.kv span{display:block;color:var(--mut);font-size:.74rem}.kv b{font-size:1.05rem}
+.fg{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.f{display:grid;gap:4px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px}
+.f label{font-size:.82rem;color:var(--mut)}
+.f.ch{border-color:var(--gold)}
+.sec{margin:16px 0 8px;color:var(--gold2);font-weight:800}
+#toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#222a4a;border:1px solid var(--gold);padding:10px 18px;border-radius:12px;z-index:99;display:none;max-width:90vw}
+#toast.bad{border-color:var(--bad);background:#3a1620}
+dialog{background:var(--panel);color:var(--txt);border:2px solid var(--gold);border-radius:14px;padding:18px;min-width:300px;max-width:92vw}
+dialog::backdrop{background:#000a}
+.cp{display:flex;gap:6px;margin:6px 0;direction:ltr}.cp select{width:auto}
+#over{position:fixed;inset:0;background:#0e1122ee;display:none;place-items:center;z-index:50;text-align:center;font-size:1.1rem}
+.small{font-size:.8rem}
+.log{max-height:360px;overflow:auto}
+</style></head><body>
+<div id="over"><div><div style="font-size:2.2rem">🔒</div><p id="overm">انقطع الاتصال</p><p class="mut small" style="margin-top:8px">لو انتهت الجلسة اكتب <b>/admin</b> في ديسكورد وادخل من جديد.</p></div></div>
+<header>
+ <span class="dot" id="dot"></span><h1>🛠️ لوحة تحكم <span id="gname">اللعبة</span></h1>
+ <span class="mut small" id="hstat"></span>
+ <nav id="nav">
+  <button data-t="rooms" class="act">الطاولات</button><button data-t="settings">إعدادات اللعبة</button>
+  <button data-t="logs">السجلات</button><button data-t="sys">ديسكورد والنظام</button>
+  <button id="out">خروج</button>
+ </nav>
+</header>
+<main>
+<section class="tab act" id="t-rooms"><div class="grid">
+ <div class="card"><h2>الطاولات الشغّالة (<span id="rc">0</span>)</h2>
+  <div class="bar"><button class="btn g" id="newRoom">+ طاولة جديدة</button></div>
+  <div class="rooms" id="rooms"></div></div>
+ <div class="card" id="detail"><div class="mut">اختر طاولة من القائمة لإدارتها.</div></div>
+</div></section>
+
+<section class="tab" id="t-settings"><div class="card">
+ <div class="row sp"><h2>كل إعدادات اللعبة</h2><div class="row"><button class="btn g" id="saveS">💾 حفظ التعديلات</button><button class="btn r" id="resetS">استرجاع الافتراضي</button></div></div>
+ <p class="mut small">التعديلات تُطبّق فوراً على اللعبة والبوت وتنحفظ تلقائياً. التوقيت وحدود الأرصدة تسري على الطاولات الجارية من اليد الجاية.</p>
+ <div id="settings"></div></div></section>
+
+<section class="tab" id="t-logs"><div class="grid" style="grid-template-columns:1fr 1fr">
+ <div class="card"><div class="row sp"><h2>آخر الفائزين</h2><button class="btn sm" id="reW">تحديث</button></div><div class="log"><table id="winT"></table></div></div>
+ <div class="card"><h2>سجل أوامر الإدارة (هذي الجلسة)</h2><div class="log"><table id="audT"></table></div></div>
+</div></section>
+
+<section class="tab" id="t-sys"><div class="grid" style="grid-template-columns:1fr 1fr">
+ <div class="card"><h2>حالة النظام</h2><div class="kv" id="sysKv"></div>
+  <div class="sec">إرسال رسالة لروم اللوق</div>
+  <textarea id="say" rows="3" maxlength="1800" placeholder="نص الرسالة…"></textarea>
+  <div class="bar"><button class="btn b" id="sayB">إرسال</button></div>
+  <div class="sec">منطقة الخطر</div>
+  <div class="bar"><button class="btn r" id="closeAll">إغلاق كل الطاولات</button></div>
+ </div>
+ <div class="card"><h2>المحظورين</h2><p class="mut small">اللاعبين اللي انحظروا عند الطرد (بالمعرّف). تقدر تفك الحظر هنا.</p><div id="bans"></div></div>
+</div></section>
+</main>
+<div id="toast"></div>
+<dialog id="dlg"><form method="dialog" id="dform"></form></dialog>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const $=id=>document.getElementById(id);
+const esc=t=>String(t==null?'':t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt=n=>Number(n).toLocaleString('en');
+const SU=['♠','♥','♦','♣'],RK={11:'J',12:'Q',13:'K',14:'A'};
+const pc=c=>!c||c===0?'<span class="pc e">?</span>':`<span class="pc ${c.s==1||c.s==2?'r':''}"><span>${RK[c.r]||c.r}</span><span>${SU[c.s]}</span></span>`;
+const sock=io('/admin',{transports:['websocket','polling']});
+let SCHEMA=[],VALUES={},ROOMS=[],SEL=null,SNAP=null,DIRTY={},sysStats=null;
+
+function toast(m,bad){const t=$('toast');t.textContent=m;t.className=bad?'bad':'';t.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>t.style.display='none',3200)}
+function cmd(name,args,quiet){return new Promise(res=>sock.emit('cmd',name,args||{},r=>{
+ if(!r||!r.ok){toast('❌ '+((r&&r.error)||'فشل'),true);return res(null)}
+ if(!quiet)toast('✅ تم');res(r.out===undefined||r.out===null?true:r.out)}))}
+const rc=(name,extra)=>cmd('room:'+name,{code:SEL,...extra});
+
+sock.on('connect',()=>{$('over').style.display='none';$('dot').className='dot on'});
+sock.on('disconnect',()=>{$('dot').className='dot';$('overm').textContent='انقطع الاتصال… يحاول يرجع';$('over').style.display='grid'});
+sock.on('connect_error',e=>{$('overm').textContent=e.message==='unauthorized'?'ما عندك جلسة صالحة':'تعذّر الاتصال';$('over').style.display='grid'});
+sock.on('hello',h=>{SCHEMA=h.schema;VALUES=h.values;buildSettings();$('gname').textContent=VALUES.title;renderAudit(h.audit);if(SEL)sock.emit('watch',SEL)});
+sock.on('values',v=>{VALUES=v;DIRTY={};buildSettings();renderBans();$('gname').textContent=VALUES.title});
+sock.on('tick',d=>{ROOMS=d.rooms;sysStats=d.stats;renderRooms();renderSys()});
+sock.on('room',s=>{SNAP=s;renderDetail()});
+
+/* ---- تبويبات ---- */
+$('nav').onclick=e=>{const b=e.target.closest('button[data-t]');if(!b)return;
+ document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('act',x===b));
+ document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('act',x.id==='t-'+b.dataset.t));
+ if(b.dataset.t==='logs')loadWinners();if(b.dataset.t==='sys')renderBans()};
+$('out').onclick=()=>{const f=document.createElement('form');f.method='post';f.action='/admin/logout';document.body.appendChild(f);f.submit()};
+
+/* ---- الطاولات ---- */
+const PH={lobby:['لوبي','lobby'],preflop:['بري فلوب','live'],flop:['فلوب','live'],turn:['تيرن','live'],river:['ريفر','live'],showdown:['كشف','show']};
+function renderRooms(){
+ $('rc').textContent=ROOMS.length;
+ $('rooms').innerHTML=ROOMS.length?ROOMS.map(r=>{const p=PH[r.phase]||[r.phase,''];
+  return `<div class="room ${r.code===SEL?'sel':''}" data-c="${esc(r.code)}"><div class="row sp"><b>${esc(r.code)}</b><span><span class="tag ${p[1]}">${p[0]}</span>${r.paused?' <span class="tag pause">متوقفة</span>':''}</span></div>
+  <div class="mut">👥 ${r.on}/${r.n} • 🎟 ${fmt(r.ticket)} • 🏆 ${fmt(r.win)}</div><div class="mut">المنظّم: ${esc(r.by||'—')} • أيدي ${r.hands}${r.pot?' • بوت '+fmt(r.pot):''}</div></div>`}).join(''):'<div class="mut">ما فيه طاولات حالياً.</div>';
+ if(SEL&&!ROOMS.some(r=>r.code===SEL)){SEL=null;SNAP=null;renderDetail()}
+}
+$('rooms').onclick=e=>{const d=e.target.closest('.room');if(!d)return;SEL=d.dataset.c;SNAP=null;sock.emit('watch',SEL);renderRooms();renderDetail()};
+$('newRoom').onclick=()=>ask('طاولة جديدة',[{k:'ticket',l:'تذكرة الدخول',v:VALUES.defaultTicket,t:'number'},{k:'win',l:'هدف الفوز',v:Math.floor(VALUES.defaultTicket*VALUES.winMult),t:'number'}],async v=>{
+ const o=await cmd('create',{ticket:+v.ticket,win:+v.win});if(o&&o.code){SEL=o.code;sock.emit('watch',SEL)}});
+
+const isEditing=()=>{const ae=document.activeElement;return !!ae&&$('detail').contains(ae)&&/INPUT|SELECT|TEXTAREA/.test(ae.tagName)};
+
+function renderDetail(){
+ const d=$('detail');
+ if(!SEL){d.innerHTML='<div class="mut">اختر طاولة من القائمة لإدارتها.</div>';return}
+ if(!SNAP){d.innerHTML='<div class="mut">جاري التحميل…</div>';return}
+ const sg=JSON.stringify([SNAP.phase,SNAP.paused,SNAP.turn,SNAP.board.length,SNAP.host,SNAP.players.map(p=>[p.id,p.name,p.left,p.folded,p.allin,p.in,p.chips,p.bet,JSON.stringify(p.hand)])]);
+ if(d.dataset.code===SNAP.code&&(d.dataset.sig===sg||isEditing())){patchLive();return}
+ d.dataset.code=SNAP.code;d.dataset.sig=sg;
+ const s=SNAP,betting=['preflop','flop','turn','river'].includes(s.phase);
+ const timer=betting&&s.left?Math.ceil(s.left/1000)+'ث':'—';
+ const rows=s.players.map(p=>`<tr class="${p.id===s.turn?'turn':''} ${p.folded||!p.in?'out':''}" data-p="${esc(p.id)}">
+  <td><b>${esc(p.name)}</b> ${p.id===s.host?'👑':''}${p.dealer?' <span class="tag">موزع</span>':''}<div class="mut small">${p.left?'🔴 خارج':'🟢 متصل'}${p.folded?' • انسحب':''}${p.allin?' • كل شي':''}</div></td>
+  <td><div class="cards">${(p.hand||[]).map(pc).join('')}</div></td>
+  <td><div class="row" style="flex-wrap:nowrap"><input type="number" class="chipIn" value="${p.chips}" style="width:110px" min="0"><button class="btn sm k" data-a="chips">حفظ</button></div><div class="mut small">رهان ${fmt(p.bet)} • إجمالي ${fmt(p.tot)}</div></td>
+  <td><div class="acts">
+   ${p.id===s.turn?'<button class="btn sm" data-a="fold">انسحاب</button><button class="btn sm" data-a="check">تمرير/مساومة</button><button class="btn sm" data-a="allin">كل شي</button>':''}
+   ${p.hand&&p.hand.length===2?'<button class="btn sm b" data-a="cards">🃏 أوراق</button>':''}
+   <button class="btn sm" data-a="rename">اسم</button><button class="btn sm" data-a="host">منظّم</button>
+   <button class="btn sm g" data-a="winner">🏆 فائز</button>
+   <button class="btn sm r" data-a="kick">طرد</button><button class="btn sm r" data-a="ban">حظر</button></div></td></tr>`).join('');
+ d.innerHTML=`<div class="row sp"><h2 style="margin:0">طاولة ${esc(s.code)} <span class="tag ${(PH[s.phase]||[0,''])[1]}">${(PH[s.phase]||[s.phase])[0]}</span>${s.paused?' <span class="tag pause">متوقفة</span>':''}</h2>
+   <span class="mut small">المنظّم: ${esc(s.by||'—')} • ${esc(s.source||'')}</span></div>
+  <div class="kv" id="kv"></div>
+  <div class="row" style="margin-bottom:8px"><span class="mut">الطاولة:</span><div class="cards" id="boardC"></div>${s.board.length?'<button class="btn sm b" data-a="boardCards">🃏 تعديل</button>':''}</div>
+  <div class="bar">
+   ${s.paused?'<button class="btn k" data-a="resume">▶ استئناف</button>':'<button class="btn" data-a="pause">⏸ إيقاف مؤقت</button>'}
+   ${s.phase==='lobby'?'<button class="btn k" data-a="forceStart">▶ ابدأ (حتى بلاعبين قليلين)</button>':''}
+   ${s.phase==='showdown'&&!s.paused?'<button class="btn" data-a="nextHand">⏭ اليد الجاية</button>':''}
+   ${betting?'<button class="btn" data-a="skip">تخطي الدور</button><button class="btn" data-a="addTime">+ وقت</button>':''}
+   <button class="btn" data-a="msg">💬 رسالة للطاولة</button>
+   <button class="btn" data-a="settings">⚙ تعديل التذكرة/الفوز/البلايند</button>
+   <button class="btn r" data-a="lobby">↩ رجوع للوبي</button><button class="btn r" data-a="close">✖ إغلاق الطاولة</button></div>
+  <table><thead><tr><th>اللاعب</th><th>الأوراق</th><th>الرصيد</th><th>إجراءات</th></tr></thead><tbody id="ptb">${rows||'<tr><td colspan="4" class="mut">ما فيه لاعبين</td></tr>'}</tbody></table>`;
+ patchLive();
+}
+function patchLive(){
+ const s=SNAP;if(!s)return;
+ const betting=['preflop','flop','turn','river'].includes(s.phase);
+ const kv=$('kv');if(kv)kv.innerHTML=[['التذكرة',fmt(s.ticket)],['هدف الفوز',fmt(s.win)],['البيج بلايند',fmt(s.bb)],['البوت',fmt(s.pot)],['الرهان الحالي',fmt(s.cur)],['اليد رقم',s.hands],['رتب الورق',(s.ranks||[]).map(r=>RK[r]||r).join(' ')||'—'],['مؤقت الدور',betting&&s.left?Math.ceil(s.left/1000)+'ث':'—']].map(x=>`<div><span>${x[0]}</span><b>${x[1]}</b></div>`).join('');
+ const b=$('boardC');if(b)b.innerHTML=[0,1,2,3,4].map(i=>s.board[i]?pc(s.board[i]):'<span class="pc e"></span>').join('');
+}
+
+$('detail').onclick=async e=>{
+ const b=e.target.closest('button[data-a]');if(!b)return;
+ const a=b.dataset.a,tr=b.closest('tr'),pid=tr&&tr.dataset.p,s=SNAP;
+ const pl=pid&&s.players.find(p=>p.id===pid);
+ switch(a){
+  case'pause':case'resume':case'forceStart':case'nextHand':case'skip':return rc(a);
+  case'close':if(confirm('إغلاق الطاولة '+s.code+'؟'))rc('close');return;
+  case'lobby':if(confirm('رجوع للوبي؟ تنتهي المباراة الجارية بدون فائز.'))rc('lobby');return;
+  case'addTime':return ask('زيادة وقت الدور',[{k:'sec',l:'ثواني',v:20,t:'number'}],v=>rc('addTime',{sec:+v.sec}));
+  case'msg':return ask('رسالة تظهر على الطاولة',[{k:'text',l:'النص',v:s.msg||'',t:'text'}],v=>rc('message',{text:v.text}));
+  case'settings':return ask('إعدادات هذي الطاولة',[{k:'ticket',l:'تذكرة الدخول (في اللوبي تحدّث أرصدة الكل)',v:s.ticket,t:'number'},{k:'win',l:'هدف الفوز',v:s.win,t:'number'},{k:'bb',l:'البيج بلايند (من اليد الجاية)',v:s.bb,t:'number'}],v=>rc('settings',{ticket:+v.ticket,win:+v.win,bb:+v.bb}));
+  case'chips':return rc('setChips',{pid,chips:+tr.querySelector('.chipIn').value});
+  case'fold':return rc('act',{pid,type:'fold'});
+  case'check':return rc('act',{pid,type:pl&&s.cur>pl.bet?'call':'check'});
+  case'allin':return rc('act',{pid,type:'allin'});
+  case'rename':return ask('تغيير اسم اللاعب',[{k:'name',l:'الاسم',v:pl.name,t:'text'}],v=>rc('rename',{pid,name:v.name}));
+  case'host':return rc('setHost',{pid});
+  case'winner':if(confirm('إعلان '+pl.name+' فائز وإنهاء المباراة؟'))rc('winner',{pid});return;
+  case'kick':if(confirm('طرد '+pl.name+'؟'))rc('kick',{pid});return;
+  case'ban':if(confirm('طرد وحظر '+pl.name+' من اللعبة كلها؟'))rc('kick',{pid,ban:true});return;
+  case'cards':return cardDlg('أوراق '+pl.name,2,pl.hand,h=>rc('cards',{pid,hand:h}));
+  case'boardCards':return cardDlg('أوراق الطاولة',s.board.length,s.board,bd=>rc('cards',{board:bd}));
+ }};
+
+/* ---- نوافذ ---- */
+function ask(title,fields,ok){
+ const f=$('dform');
+ f.innerHTML=`<h2 style="margin-bottom:10px;color:var(--gold2)">${esc(title)}</h2>`+fields.map(x=>`<div class="f" style="margin-bottom:8px"><label>${esc(x.l)}</label><input name="${x.k}" type="${x.t==='number'?'number':'text'}" value="${esc(x.v)}"></div>`).join('')+
+ '<div class="row" style="margin-top:10px"><button class="btn g" value="ok">موافق</button><button class="btn" value="cancel">إلغاء</button></div>';
+ f.onsubmit=null;$('dlg').onclose=()=>{if($('dlg').returnValue==='ok'){const v={};fields.forEach(x=>v[x.k]=f.elements[x.k].value);ok(v)}};
+ $('dlg').returnValue='';$('dlg').showModal();
+}
+function cardDlg(title,n,cur,ok){
+ const f=$('dform');
+ const opt=(i,c)=>`<div class="cp" data-i="${i}"><select class="cr">${((SNAP&&SNAP.ranks&&SNAP.ranks.length)?SNAP.ranks:[14,13,12,11,10,9,8,7]).map(r=>`<option value="${r}" ${c&&c.r===r?'selected':''}>${RK[r]||r}</option>`).join('')}</select><select class="cs">${SU.map((x,k)=>`<option value="${k}" ${c&&c.s===k?'selected':''}>${x}</option>`).join('')}</select>${pc(c)}</div>`;
+ f.innerHTML=`<h2 style="margin-bottom:6px;color:var(--gold2)">${esc(title)}</h2><p class="mut small">اختر الأوراق — السيرفر يرفض لو الورقة موجودة عند لاعب ثاني أو في الطاولة.</p>`+Array.from({length:n},(_,i)=>opt(i,cur[i])).join('')+
+ '<div class="row" style="margin-top:10px"><button class="btn g" value="ok">تطبيق</button><button class="btn" value="cancel">إلغاء</button></div>';
+ $('dlg').onclose=()=>{if($('dlg').returnValue==='ok')ok([...f.querySelectorAll('.cp')].map(p=>({r:+p.querySelector('.cr').value,s:+p.querySelector('.cs').value})))};
+ $('dlg').returnValue='';$('dlg').showModal();
+}
+
+/* ---- الإعدادات ---- */
+function buildSettings(){
+ const groups=[...new Set(SCHEMA.map(s=>s.g))];
+ $('settings').innerHTML=groups.map(g=>`<div class="sec">${esc(g)}</div><div class="fg">`+SCHEMA.filter(s=>s.g===g).map(s=>{
+  const v=VALUES[s.k];let inp;
+  if(s.t==='bool')inp=`<label style="display:flex;gap:8px;align-items:center;color:var(--txt)"><input type="checkbox" data-k="${s.k}" ${v?'checked':''}> مفعّل</label>`;
+  else if(s.t==='color')inp=`<input type="color" data-k="${s.k}" value="${esc(v)}">`;
+  else if(s.t==='list'||s.t==='hands')inp=`<textarea data-k="${s.k}" rows="${s.t==='hands'?9:4}">${esc((v||[]).join('\n'))}</textarea>`;
+  else if(s.t==='int'||s.t==='float')inp=`<input data-k="${s.k}" type="number" step="${s.t==='float'?'any':1}" min="${s.min}" max="${s.max}" value="${esc(v)}">`;
+  else inp=`<input data-k="${s.k}" type="text" maxlength="${s.max||200}" value="${esc(v)}">`;
+  return `<div class="f" data-f="${s.k}"><label>${esc(s.label)}</label>${inp}</div>`}).join('')+'</div>').join('');
+}
+function readField(s){
+ const el=document.querySelector(`[data-k="${s.k}"]`);
+ if(s.t==='bool')return el.checked;
+ if(s.t==='list'||s.t==='hands')return el.value.split('\n').map(x=>x.trim()).filter(x=>s.t==='hands'||x);
+ return el.value;
+}
+$('settings').addEventListener('input',e=>{const f=e.target.closest('.f');if(f)f.classList.add('ch')});
+$('saveS').onclick=async()=>{
+ const patch={};
+ SCHEMA.forEach(s=>{const nv=readField(s),ov=VALUES[s.k];const same=(s.t==='int'||s.t==='float')?Number(nv)===ov:JSON.stringify(nv)===JSON.stringify(ov);if(!same)patch[s.k]=nv});
+ if(!Object.keys(patch).length)return toast('ما فيه تعديلات');
+ const o=await cmd('settings:set',{patch});if(o)toast('✅ انحفظ وتطبّق ('+Object.keys(o).length+')');
+};
+$('resetS').onclick=()=>{if(confirm('استرجاع كل الإعدادات للافتراضي؟'))cmd('settings:reset')};
+
+/* ---- السجلات ---- */
+async function loadWinners(){
+ const w=await cmd('winners',{},true)||[];
+ $('winT').innerHTML='<tr><th>الوقت</th><th>الفائز</th><th>الطاولة</th><th>اللاعبين</th><th>الأيدي</th></tr>'+(w.map(x=>`<tr><td class="small">${new Date(x.at).toLocaleString('ar-SA')}</td><td><b>${esc(x.winner&&x.winner.name)}</b><div class="mut small">${fmt(x.winner&&x.winner.chips||0)}</div></td><td>${esc(x.code)}</td><td>${x.players}</td><td>${x.hands}</td></tr>`).join('')||'<tr><td colspan="5" class="mut">لا يوجد</td></tr>');
+}
+$('reW').onclick=loadWinners;
+function renderAudit(a){$('audT').innerHTML='<tr><th>الوقت</th><th>الأمر</th><th>الطاولة</th></tr>'+((a||[]).map(x=>`<tr><td class="small">${new Date(x.at).toLocaleTimeString('ar-SA')}</td><td>${esc(x.cmd)}</td><td>${esc(x.code||'')}</td></tr>`).join('')||'<tr><td colspan="3" class="mut">فاضي</td></tr>')}
+
+/* ---- النظام ---- */
+function up(s){const h=Math.floor(s/3600),m=Math.floor(s%3600/60);return h+'س '+m+'د'}
+function renderSys(){
+ const s=sysStats;if(!s)return;
+ $('hstat').textContent='👥 '+s.clients+' متصل • '+ROOMS.length+' طاولة';
+ $('sysKv').innerHTML=[['مدة التشغيل',up(s.uptime)],['الذاكرة',s.mem+' MB'],['المتصلين',s.clients],['البوت',s.bot?(s.bot.ready?'✅ '+esc(s.bot.tag):'⏳ يتصل'):'❌ مطفي'],['بينق ديسكورد',s.bot&&s.bot.ping>=0?s.bot.ping+'ms':'—'],['سيرفرات البوت',s.bot?s.bot.guilds:'—']].map(x=>`<div><span>${x[0]}</span><b>${x[1]}</b></div>`).join('');
+}
+function renderBans(){
+ const b=VALUES.bannedPids||[];
+ $('bans').innerHTML=b.length?b.map(x=>`<div class="row sp" style="margin-bottom:6px"><code class="small">${esc(x)}</code><button class="btn sm k" data-u="${esc(x)}">فك الحظر</button></div>`).join(''):'<div class="mut">ما فيه محظورين.</div>';
+}
+$('bans').onclick=async e=>{const b=e.target.closest('[data-u]');if(b)await cmd('unban',{pid:b.dataset.u})};
+$('sayB').onclick=async()=>{const t=$('say').value.trim();if(!t)return;if(await cmd('bot:say',{text:t}))$('say').value=''};
+$('closeAll').onclick=()=>{if(confirm('إغلاق كل الطاولات الجارية؟'))cmd('closeAll')};
+</script></body></html>

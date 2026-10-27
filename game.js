@@ -96,10 +96,17 @@ function createEngine(hooks = {}, timing = {}) {
     call('onClose', r, why);
   }
 
+  // المنظّم: اللي أنشأ الطاولة من الموقع (لو طلع من اللوبي ينتقل مؤقتاً لأول لاعب)
+  function hostOf(r) {
+    const h = r.meta && r.meta.hostPid;
+    if (!h) return null;
+    return r.players.some(x => x.id === h) ? h : (r.players[0] ? r.players[0].id : null);
+  }
+
   function view(r, me) {
     const sd = r.phase === 'showdown' && r.reveal;
     return {
-      code: r.code, phase: r.phase, host: null, by: (r.meta && r.meta.creatorName) || '', me: me.id, bb: r.bb,
+      code: r.code, phase: r.phase, host: hostOf(r), by: (r.meta && r.meta.creatorName) || '', me: me.id, bb: r.bb,
       ticket: r.ticket, win: r.win, board: r.board, cur: r.cur, minRaise: r.minRaise,
       pot: r.players.reduce((s, p) => s + p.tot, 0),
       turn: r.players[r.turn] ? r.players[r.turn].id : undefined,
@@ -311,7 +318,7 @@ function createEngine(hooks = {}, timing = {}) {
     if (p && !p.left) act0(r, p, type, amount);
   }
 
-  return { rooms, createRoom, join, leave, start, act, destroy, view };
+  return { rooms, createRoom, join, leave, start, act, destroy, view, hostOf };
 }
 
 module.exports = { createEngine, GameError, ev5, best, cmp };

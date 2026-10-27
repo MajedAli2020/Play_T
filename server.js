@@ -66,6 +66,22 @@ io.on('connection', s => {
     engine.join(r, s.id, id, cleanName(d.name));
     room = r; pid = id; s.join(r.code);
   });
+  on('create', d => {
+    if (room) return;
+    const name = cleanName(d.name);
+    if (!name) throw new GameError('اكتب اسمك');
+    const id = cleanPid(d.pid) || s.id;
+    const r = engine.createRoom({ ticket: d.ticket, win: d.win, meta: { creatorName: name, hostPid: id, source: 'web' } });
+    try { engine.join(r, s.id, id, name); } catch (e) { engine.destroy(r, 'error'); throw e; }
+    room = r; pid = id; s.join(r.code);
+  });
+  on('start', () => {
+    if (!room) return;
+    const h = engine.hostOf(room);
+    if (!h) throw new GameError('المنظّم يبدأ اللعبة من ديسكورد');
+    if (h !== pid) throw new GameError('بس المنظّم يقدر يبدأ اللعبة');
+    engine.start(room);
+  });
   on('act', d => { if (room) engine.act(room, pid, d.type, d.amount); });
   s.on('disconnect', () => {
     clearInterval(rl);

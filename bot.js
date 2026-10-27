@@ -115,7 +115,7 @@ function start({ engine, token, baseUrl, logChannelId, guildId }) {
       .setDescription('الفائز: **' + safe(s.winner.name) + '** برصيد **' + fmt(s.winner.chips) + '**')
       .addFields(
         { name: 'الطاولة', value: s.code, inline: true },
-        { name: 'المنظّم', value: s.meta && s.meta.creatorId ? '<@' + s.meta.creatorId + '>' : '—', inline: true },
+        { name: 'المنظّم', value: s.meta && s.meta.creatorId ? '<@' + s.meta.creatorId + '>' : (s.meta && s.meta.creatorName ? safe(s.meta.creatorName) : '—'), inline: true },
         { name: 'اللاعبين', value: String(s.players), inline: true },
         { name: 'تذكرة الدخول', value: fmt(s.ticket), inline: true },
         { name: 'هدف الفوز', value: fmt(s.win), inline: true },

@@ -73,13 +73,15 @@ button{font-family:inherit;cursor:pointer}
 </style></head><body>
 <div id="net" hidden></div><div id="home" class="box"><h1>رويال بوكر</h1>
 <label>اسمك<input id="nm" maxlength="14" placeholder="مثال: أبو فهد"></label>
-<div id="hint" style="color:#cdbf94;font-size:.9rem;line-height:1.7">الطاولات تنفتح من ديسكورد بالأمر <b>/poker</b> — افتح رابط الطاولة اللي ينرسل، أو اكتب الكود تحت.</div>
+<div id="cf" style="display:grid;gap:12px"><label>تذكرة الدخول (رصيد كل لاعب)<input id="ch" type="number" value="10000" min="20"></label><label>الفوز (يفوز أول من يوصل له)<input id="wn" type="number" value="30000"></label>
+<button id="create" class="btn gold">إنشاء طاولة جديدة</button><div style="color:#cdbf94;text-align:center;font-size:.85rem">— أو ادخل طاولة موجودة —</div></div>
 <label>كود الطاولة<input id="code" maxlength="4" placeholder="ABCD" style="text-transform:uppercase"></label>
 <button id="join" class="btn">دخول الطاولة</button></div>
 
 <div id="lobby" class="box" hidden><h1>الطاولة <span id="lc"></span></h1>
 <label>رابط الدعوة<div class="row"><input id="link" readonly><button id="copy" class="btn gold" style="flex:none">نسخ</button></div></label>
-<div id="lt" style="color:var(--gold2);font-weight:800"></div><div id="plist"></div><div id="lmsg" style="color:#cdbf94;font-size:.9rem"></div></div>
+<div id="lt" style="color:var(--gold2);font-weight:800"></div><div id="plist"></div><div id="lmsg" style="color:#cdbf94;font-size:.9rem"></div>
+<button id="start" class="btn gold" hidden>ابدأ اللعب</button></div>
 
 <div id="game" hidden><div id="rug"></div>
 <button class="rb" id="bl" style="top:10px" aria-label="نسخ رابط الدعوة">🔗</button><button class="rb" id="bx" style="top:64px" aria-label="خروج">🚪</button>
@@ -98,10 +100,12 @@ const card=c=>c===0?'<div class="c b"></div>':`<div class="c ${c.s==1||c.s==2?'r
 const coin='<span class="coin">♣</span>',hue=t=>[...t].reduce((a,c)=>a*31+c.charCodeAt(0),7)%360;
 const ls={get:k=>{try{return localStorage.getItem(k)}catch(e){return null}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}},del:k=>{try{localStorage.removeItem(k)}catch(e){}}};
 let pid=ls.get('rp_pid');if(!pid){pid=(crypto.randomUUID?crypto.randomUUID():Math.random().toString(36).slice(2)+Date.now().toString(36)+Math.random().toString(36).slice(2));ls.set('rp_pid',pid)}
-const m=location.pathname.match(/^\/r\/(\w+)/);if(m){$('code').value=m[1].toUpperCase();$('hint').hidden=true}
+const m=location.pathname.match(/^\/r\/(\w+)/);if(m){$('code').value=m[1].toUpperCase();$('cf').hidden=true}
 $('nm').value=ls.get('rp_name')||'';let joined=false;
 const doJoin=()=>{if(!sock.connected)return net(OFF);const name=$('nm').value.trim();ls.set('rp_name',name);sock.emit('join',{name,code:$('code').value.trim(),pid})};
 $('join').onclick=doJoin;
+$('create').onclick=()=>{if(!sock.connected)return net(OFF);const name=$('nm').value.trim();ls.set('rp_name',name);sock.emit('create',{name,ticket:+$('ch').value,win:+$('wn').value,pid})};
+$('start').onclick=()=>sock.emit('start');
 const cp=b=>{navigator.clipboard.writeText($('link').value);b.textContent='تم النسخ'};
 $('copy').onclick=()=>cp($('copy'));$('bl').onclick=()=>{navigator.clipboard.writeText(location.href);$('bl').textContent='✓'};
 $('bx').onclick=()=>{ls.del('rp_room');location.href='/'};
@@ -123,8 +127,9 @@ function render(){
  const me=st.players.find(p=>p.id===st.me);
  if(lobby){$('lc').textContent=st.code;$('lt').textContent='تذكرة الدخول '+fmt(st.ticket)+' • الفوز '+fmt(st.win);$('link').value=location.origin+'/r/'+st.code;
   $('plist').innerHTML=st.players.map(p=>`<div class="pl"><span class="av" style="width:36px;height:36px;font-size:1.1rem;background:hsl(${hue(p.name)},35%,20%)">${esc([...p.name][0])}</span>${esc(p.name)}${p.id===st.host?' 👑':''}<span class="mn">${fmt(p.chips)}</span></div>`).join('');
-  const cnt=st.players.filter(p=>p.chips>0).length,ok=cnt>=3;
-  $('lmsg').textContent=st.msg||(ok?'جاهزين — بانتظار المنظّم'+(st.by?' ('+st.by+')':'')+' يبدأ اللعبة من ديسكورد':'نحتاج 3 لاعبين على الأقل ('+cnt+'/3) — أرسل الرابط لخواتك');return}
+  const cnt=st.players.filter(p=>p.chips>0).length,ok=cnt>=3,isH=!!st.host&&st.host===st.me;
+  $('lmsg').textContent=st.msg||(ok?(isH?'جاهزين — اضغط ابدأ اللعب':(st.host?'جاهزين — بانتظار المنظّم يبدأ اللعبة':'جاهزين — بانتظار المنظّم'+(st.by?' ('+st.by+')':'')+' يبدأ اللعبة من ديسكورد')):'نحتاج 3 لاعبين على الأقل ('+cnt+'/3) — أرسل الرابط لخواتك');
+  $('start').hidden=!isH;$('start').style.opacity=ok?1:.6;return}
  const n=st.players.length,mi=st.players.indexOf(me);let h='';
  st.players.forEach((p,i)=>{const k=(i-mi+n)%n,a=Math.PI/2+k*2*Math.PI/n,x=50+36*Math.cos(a),y=k?52+33*Math.sin(a):98,t=p.id===st.turn,pc=Math.min(100,Math.round(p.chips/st.win*100));
   const cards=`<div class="cards">${p.hand.map(card).join('')}</div>`;

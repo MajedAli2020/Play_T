@@ -64,15 +64,60 @@ function attach({ app, io, engine, cfg, getBot, adminId, port }) {
     const exp = links.get(t);
     if (!exp || exp < Date.now()) { fail(ip); return s.status(403).send(page('منتهي', '<h2>الرابط منتهي أو مستخدم</h2>')); }
     links.delete(t);
+    startSession(s);
+    s.redirect('/admin');
+  });
+
+  function startSession(res, extra) {
     const sid = rnd(32);
     sessions.set(sid, Date.now() + SESSION_MS);
-    s.setHeader('Set-Cookie', 'adm=' + sid + '; HttpOnly; SameSite=Strict; Path=/; Max-Age=' + SESSION_MS / 1000 + (secure() ? '; Secure' : ''));
-    s.redirect('/admin');
+    const c = ['adm=' + sid + '; HttpOnly; SameSite=Lax; Path=/; Max-Age=' + SESSION_MS / 1000 + (secure() ? '; Secure' : '')];
+    if (extra) c.push(extra);
+    res.setHeader('Set-Cookie', c);
+  }
+
+  /* ---------- الدخول بحساب ديسكورد (OAuth) — من الموقع نفسه ---------- */
+  const SECRET = () => process.env.DISCORD_CLIENT_SECRET || '';
+  const clientId = () => process.env.DISCORD_CLIENT_ID || (getBot() && getBot().status().appId) || '';
+  const redirectUri = () => base() + '/admin/callback';
+
+  app.get('/admin/me', (q, s) => s.json({ admin: hasSession(q.headers.cookie), login: !!SECRET() }));
+
+  app.get('/admin/discord', (q, s) => {
+    if (!SECRET() || !clientId())
+      return s.status(501).send(page('غير مفعّل', '<h2>الدخول بديسكورد غير مفعّل</h2><p>أضف <b>DISCORD_CLIENT_SECRET</b> في ملف .env (من Developer Portal ← OAuth2) وأضف الرابط التالي في Redirects:</p><p dir="ltr"><code>' + redirectUri() + '</code></p><p>أو استخدم الأمر <b>/admin</b> في ديسكورد.</p>'));
+    const st = rnd(16);
+    s.setHeader('Set-Cookie', 'ost=' + st + '; HttpOnly; SameSite=Lax; Path=/admin; Max-Age=600' + (secure() ? '; Secure' : ''));
+    s.redirect('https://discord.com/oauth2/authorize?' + new URLSearchParams({ client_id: clientId(), response_type: 'code', redirect_uri: redirectUri(), scope: 'identify', state: st }));
+  });
+
+  app.get('/admin/callback', async (q, s) => {
+    const ip = q.ip;
+    if (limited(ip)) return s.status(429).send(page('كثير', '<h2>محاولات كثيرة</h2>'));
+    const code = String(q.query.code || ''), st = String(q.query.state || '');
+    const ck = parseCookies(q.headers.cookie).ost;
+    if (!code || !ck || !same(ck, st)) { fail(ip); return s.status(403).send(page('خطأ', '<h2>جلسة الدخول غير صالحة</h2><p><a href="/admin/discord" style="color:#e7b84b">جرّب مرة ثانية</a></p>')); }
+    try {
+      const tr = await fetch('https://discord.com/api/oauth2/token', {
+        method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ client_id: clientId(), client_secret: SECRET(), grant_type: 'authorization_code', code, redirect_uri: redirectUri() })
+      });
+      const tk = await tr.json();
+      if (!tk.access_token) throw new Error('token');
+      const ur = await fetch('https://discord.com/api/users/@me', { headers: { authorization: 'Bearer ' + tk.access_token } });
+      const u = await ur.json();
+      if (!u || String(u.id) !== String(adminId)) { fail(ip); return s.status(403).send(page('ممنوع', '<h2>🔒 هذا الحساب ما عنده صلاحية</h2>')); }
+      startSession(s, 'ost=; HttpOnly; SameSite=Lax; Path=/admin; Max-Age=0');
+      s.redirect('/admin');
+    } catch (e) {
+      console.error('admin oauth:', e.message);
+      s.status(500).send(page('خطأ', '<h2>تعذّر الدخول بديسكورد</h2><p>تأكد من DISCORD_CLIENT_SECRET ومن إضافة رابط الـRedirect.</p>'));
+    }
   });
   app.post('/admin/logout', (q, s) => {
     const t = parseCookies(q.headers.cookie).adm;
     if (t) sessions.delete(t);
-    s.setHeader('Set-Cookie', 'adm=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0');
+    s.setHeader('Set-Cookie', 'adm=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0');
     s.redirect('/');
   });
   app.get('/admin', (q, s) => {
@@ -141,7 +186,7 @@ function attach({ app, io, engine, cfg, getBot, adminId, port }) {
           if (!r) throw new GameError('الطاولة غير موجودة');
           f(r, a);
         } else if (name === 'create') {
-          const r = engine.createRoom({ ticket: a.ticket ?? cfg.defaultTicket, win: a.win ?? Math.floor((a.ticket ?? cfg.defaultTicket) * cfg.winMult), meta: { creatorName: 'الإدارة', source: 'admin', admin: true } });
+          const r = engine.createRoom({ maxPlayers: a.maxPlayers, minPlayers: a.minPlayers, ticket: a.ticket ?? cfg.defaultTicket, win: a.win ?? Math.floor((a.ticket ?? cfg.defaultTicket) * cfg.winMult), meta: { creatorName: 'الإدارة', source: 'admin', admin: true } });
           out = { code: r.code };
         } else if (name === 'closeAll') {
           [...engine.rooms.values()].forEach(r => engine.destroy(r, 'admin'));

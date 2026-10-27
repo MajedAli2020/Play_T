@@ -21,6 +21,8 @@ function start({ engine, cfg, token, guildId, adminId, issueAdminLink }) {
   const command = new SlashCommandBuilder()
     .setName('poker').setDescription('افتح طاولة بوكر جديدة')
     .addIntegerOption(o => o.setName('ticket').setDescription('تذكرة الدخول (رصيد كل لاعب) — الافتراضي 10000').setMinValue(20).setMaxValue(1000000000))
+    .addIntegerOption(o => o.setName('players').setDescription('أقصى عدد لاعبين في الطاولة (2-12)').setMinValue(2).setMaxValue(12))
+    .addIntegerOption(o => o.setName('min').setDescription('أقل عدد لاعبين لبدء اللعبة (2-12)').setMinValue(2).setMaxValue(12))
     .addIntegerOption(o => o.setName('win').setDescription('رصيد الفوز (يفوز أول من يوصله) — الافتراضي ثلاثة أضعاف التذكرة').setMinValue(40).setMaxValue(1000000000000));
   const adminCommand = new SlashCommandBuilder().setName('admin').setDescription('لوحة التحكم (للمالك فقط)');
 
@@ -31,7 +33,7 @@ function start({ engine, cfg, token, guildId, adminId, issueAdminLink }) {
     let status;
     if (!lobby) status = '🎲 اللعبة جارية — اليد رقم ' + room.hands;
     else status = (room.lastWinner ? '🏆 آخر فائز: **' + safe(room.lastWinner.name) + '**\n' : '') +
-      (names.length >= cfg.minPlayers ? 'جاهزين — المنظّم يضغط «ابدأ»' : 'بانتظار اللاعبين — يلزم ' + cfg.minPlayers + ' على الأقل');
+      (names.length >= (room.minPlayers || cfg.minPlayers) ? 'جاهزين — المنظّم يضغط «ابدأ»' : 'بانتظار اللاعبين — يلزم ' + (room.minPlayers || cfg.minPlayers) + ' على الأقل');
     const embed = new EmbedBuilder().setColor(color())
       .setTitle(cfg.panelTitle + ' — طاولة ' + room.code)
       .setDescription(status)
@@ -39,7 +41,7 @@ function start({ engine, cfg, token, guildId, adminId, issueAdminLink }) {
         { name: 'المنظّم', value: '<@' + room.meta.creatorId + '>', inline: true },
         { name: 'تذكرة الدخول', value: fmt(room.ticket), inline: true },
         { name: 'هدف الفوز', value: fmt(room.win), inline: true },
-        { name: 'اللاعبين (' + names.length + '/' + cfg.maxPlayers + ')', value: names.length ? names.join('، ') : '—' }
+        { name: 'اللاعبين (' + names.length + '/' + (room.maxPlayers || cfg.maxPlayers) + ')', value: names.length ? names.join('، ') : '—' }
       );
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel('🎮 ادخل الطاولة').setURL(cfg.baseUrl + '/r/' + room.code),
@@ -70,7 +72,7 @@ function start({ engine, cfg, token, guildId, adminId, issueAdminLink }) {
     let room;
     try {
       room = engine.createRoom({
-        ticket, win,
+        ticket, win, maxPlayers: i.options.getInteger('players'), minPlayers: i.options.getInteger('min'),
         meta: { creatorId: i.user.id, creatorName: i.member?.displayName || i.user.username, channelId: i.channelId }
       });
     } catch (e) { return i.reply({ content: '❌ ' + e.message, flags: EPH }); }
@@ -101,9 +103,11 @@ function start({ engine, cfg, token, guildId, adminId, issueAdminLink }) {
     console.log('✅ بوت ديسكورد شغّال: ' + c.user.tag);
     try {
       const cmds = [command.toJSON(), adminCommand.toJSON()];
-      if (guildId) await c.application.commands.set(cmds, guildId);
-      else await c.application.commands.set(cmds);
-      console.log('✅ تم تسجيل الأمر /poker' + (guildId ? ' (سيرفر محدد)' : ' (عام — قد يتأخر حتى ساعة)'));
+      // تسجيل لكل سيرفر البوت فيه (فوري). الأوامر العامة تتأخر وتتكرر، فنفضّيها.
+      await c.application.commands.set([]);
+      for (const g of c.guilds.cache.values()) await g.commands.set(cmds).catch(e => console.error('guild cmds ' + g.id + ':', e.message));
+      client.on(Events.GuildCreate, g => g.commands.set(cmds).catch(() => {}));
+      console.log('✅ تم تسجيل الأوامر /poker و /admin في ' + c.guilds.cache.size + ' سيرفر');
     } catch (e) { console.error('فشل تسجيل الأوامر:', e.message); }
   });
 
@@ -162,7 +166,7 @@ function start({ engine, cfg, token, guildId, adminId, issueAdminLink }) {
 
   return {
     say,
-    status: () => ({ ready: client.isReady(), tag: client.user ? client.user.tag : null, guilds: client.guilds.cache.size, ping: client.ws.ping }),
+    status: () => ({ appId: client.application ? client.application.id : null, ready: client.isReady(), tag: client.user ? client.user.tag : null, guilds: client.guilds.cache.size, ping: client.ws.ping }),
     onEnd: s => { sendLog(s).catch(e => console.error('sendLog:', e)); },
     onChange: room => refresh(room),
     onClose: (room, why) => {

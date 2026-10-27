@@ -71,13 +71,16 @@ svg.c{display:block;padding:0;background:none;box-shadow:0 2px 5px #0008;border-
 #bar.on #allin{opacity:1;animation:glow 1.8s ease-in-out infinite}
 @keyframes glow{50%{box-shadow:inset 0 1px 0 #fff9,0 0 24px var(--gold2),0 3px 0 #0009}}
 @media(prefers-reduced-motion:reduce){#bar.on #allin{animation:none}}
+#adm{position:fixed;bottom:12px;left:12px;z-index:98;background:linear-gradient(#ffe08a,#e7b84b 55%,#b9821a);color:#3a2400;border:2px solid #fff1b8;border-radius:12px;padding:8px 14px;font-weight:800;font-size:.9rem;text-decoration:none;box-shadow:0 3px 10px #000a}
+#admin-in{color:#8d7550;font-size:.75rem;text-align:center;text-decoration:none}
 </style></head><body>
+<a id="adm" href="/admin" hidden>🛠️ لوحة التحكم</a>
 <div id="net" hidden></div><div id="home" class="box"><h1 id="ttl">رويال بوكر</h1><div id="mt" hidden style="background:#8a1020;border-radius:10px;padding:8px;text-align:center;font-weight:800"></div>
 <label>اسمك<input id="nm" maxlength="14" placeholder="مثال: أبو فهد"></label>
 <div id="cf" style="display:grid;gap:12px"><label>تذكرة الدخول (رصيد كل لاعب)<input id="ch" type="number" value="10000" min="20"></label><label>الفوز (يفوز أول من يوصل له)<input id="wn" type="number" value="30000"></label>
 <button id="create" class="btn gold">إنشاء طاولة جديدة</button><div style="color:#cdbf94;text-align:center;font-size:.85rem">— أو ادخل طاولة موجودة —</div></div>
 <label>كود الطاولة<input id="code" maxlength="4" placeholder="ABCD" style="text-transform:uppercase"></label>
-<button id="join" class="btn">دخول الطاولة</button></div>
+<button id="join" class="btn">دخول الطاولة</button><a id="admin-in" href="/admin/discord" hidden>🔑 دخول الإدارة</a></div>
 
 <div id="lobby" class="box" hidden><h1>الطاولة <span id="lc"></span></h1>
 <label>رابط الدعوة<div class="row"><input id="link" readonly><button id="copy" class="btn gold" style="flex:none">نسخ</button></div></label>
@@ -141,6 +144,7 @@ fetch('/config.json').then(r=>r.json()).then(c=>{
  if(!c.allowWebCreate){$('cf').hidden=true}
  if(c.maintenance){$('mt').textContent=c.maintenanceMsg;$('mt').hidden=false}
 }).catch(()=>{});
+fetch('/admin/me').then(r=>r.json()).then(a=>{if(a.admin)$('adm').hidden=false;else if(a.login&&!m)$('admin-in').hidden=false}).catch(()=>{});
 const net=m=>{$('net').textContent=m;$('net').hidden=false};
 const OFF='ما قدرت أتصل بالسيرفر. تأكد إن السيرفر شغّال وافتح الموقع من الرابط (مو من الملف مباشرة).';
 if(typeof io==='undefined')net(OFF);

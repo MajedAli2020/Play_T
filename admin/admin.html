@@ -66,11 +66,16 @@ dialog::backdrop{background:#000a}
  <nav id="nav">
   <button data-t="rooms" class="act">الطاولات</button><button data-t="settings">إعدادات اللعبة</button>
   <button data-t="logs">السجلات</button><button data-t="sys">ديسكورد والنظام</button>
-  <button id="out">خروج</button>
+  <a class="btn" href="/" style="text-decoration:none;color:inherit">🎮 اللعبة</a><button id="out">خروج</button>
  </nav>
 </header>
 <main>
-<section class="tab act" id="t-rooms"><div class="grid">
+<section class="tab act" id="t-rooms">
+<div class="card" style="margin-bottom:14px"><h2>👥 عدد اللاعبين (لكل الطاولات الجديدة — قبل بدء أي جلسة)</h2>
+ <div class="row"><label class="mut">أقل عدد لبدء اللعبة <input id="qMin" type="number" min="2" max="12" style="width:90px"></label>
+ <label class="mut">أقصى عدد في الطاولة <input id="qMax" type="number" min="2" max="12" style="width:90px"></label>
+ <button class="btn g" id="qSave">حفظ</button><span class="mut small">الورق: 4 لاعبين = أكه شايب بنت ولد، وكل لاعب زيادة تزيد رتبة (لين 8).</span></div></div>
+<div class="grid">
  <div class="card"><h2>الطاولات الشغّالة (<span id="rc">0</span>)</h2>
   <div class="bar"><button class="btn g" id="newRoom">+ طاولة جديدة</button></div>
   <div class="rooms" id="rooms"></div></div>
@@ -142,8 +147,8 @@ function renderRooms(){
  if(SEL&&!ROOMS.some(r=>r.code===SEL)){SEL=null;SNAP=null;renderDetail()}
 }
 $('rooms').onclick=e=>{const d=e.target.closest('.room');if(!d)return;SEL=d.dataset.c;SNAP=null;sock.emit('watch',SEL);renderRooms();renderDetail()};
-$('newRoom').onclick=()=>ask('طاولة جديدة',[{k:'ticket',l:'تذكرة الدخول',v:VALUES.defaultTicket,t:'number'},{k:'win',l:'هدف الفوز',v:Math.floor(VALUES.defaultTicket*VALUES.winMult),t:'number'}],async v=>{
- const o=await cmd('create',{ticket:+v.ticket,win:+v.win});if(o&&o.code){SEL=o.code;sock.emit('watch',SEL)}});
+$('newRoom').onclick=()=>ask('طاولة جديدة',[{k:'ticket',l:'تذكرة الدخول',v:VALUES.defaultTicket,t:'number'},{k:'win',l:'هدف الفوز',v:Math.floor(VALUES.defaultTicket*VALUES.winMult),t:'number'},{k:'maxPlayers',l:'أقصى عدد لاعبين',v:VALUES.maxPlayers,t:'number'},{k:'minPlayers',l:'أقل عدد لبدء اللعبة',v:VALUES.minPlayers,t:'number'}],async v=>{
+ const o=await cmd('create',{ticket:+v.ticket,win:+v.win,maxPlayers:+v.maxPlayers,minPlayers:+v.minPlayers});if(o&&o.code){SEL=o.code;sock.emit('watch',SEL)}});
 
 const isEditing=()=>{const ae=document.activeElement;return !!ae&&$('detail').contains(ae)&&/INPUT|SELECT|TEXTAREA/.test(ae.tagName)};
 
@@ -184,7 +189,7 @@ function renderDetail(){
 function patchLive(){
  const s=SNAP;if(!s)return;
  const betting=['preflop','flop','turn','river'].includes(s.phase);
- const kv=$('kv');if(kv)kv.innerHTML=[['التذكرة',fmt(s.ticket)],['هدف الفوز',fmt(s.win)],['البيج بلايند',fmt(s.bb)],['البوت',fmt(s.pot)],['الرهان الحالي',fmt(s.cur)],['اليد رقم',s.hands],['رتب الورق',(s.ranks||[]).map(r=>RK[r]||r).join(' ')||'—'],['مؤقت الدور',betting&&s.left?Math.ceil(s.left/1000)+'ث':'—']].map(x=>`<div><span>${x[0]}</span><b>${x[1]}</b></div>`).join('');
+ const kv=$('kv');if(kv)kv.innerHTML=[['التذكرة',fmt(s.ticket)],['هدف الفوز',fmt(s.win)],['البيج بلايند',fmt(s.bb)],['البوت',fmt(s.pot)],['الرهان الحالي',fmt(s.cur)],['اللاعبين',s.players.length+' / '+s.maxPlayers+' (أقل '+s.minPlayers+')'],['اليد رقم',s.hands],['رتب الورق',(s.ranks||[]).map(r=>RK[r]||r).join(' ')||'—'],['مؤقت الدور',betting&&s.left?Math.ceil(s.left/1000)+'ث':'—']].map(x=>`<div><span>${x[0]}</span><b>${x[1]}</b></div>`).join('');
  const b=$('boardC');if(b)b.innerHTML=[0,1,2,3,4].map(i=>s.board[i]?pc(s.board[i]):'<span class="pc e"></span>').join('');
 }
 
@@ -198,7 +203,7 @@ $('detail').onclick=async e=>{
   case'lobby':if(confirm('رجوع للوبي؟ تنتهي المباراة الجارية بدون فائز.'))rc('lobby');return;
   case'addTime':return ask('زيادة وقت الدور',[{k:'sec',l:'ثواني',v:20,t:'number'}],v=>rc('addTime',{sec:+v.sec}));
   case'msg':return ask('رسالة تظهر على الطاولة',[{k:'text',l:'النص',v:s.msg||'',t:'text'}],v=>rc('message',{text:v.text}));
-  case'settings':return ask('إعدادات هذي الطاولة',[{k:'ticket',l:'تذكرة الدخول (في اللوبي تحدّث أرصدة الكل)',v:s.ticket,t:'number'},{k:'win',l:'هدف الفوز',v:s.win,t:'number'},{k:'bb',l:'البيج بلايند (من اليد الجاية)',v:s.bb,t:'number'}],v=>rc('settings',{ticket:+v.ticket,win:+v.win,bb:+v.bb}));
+  case'settings':return ask('إعدادات هذي الطاولة',[{k:'ticket',l:'تذكرة الدخول (في اللوبي تحدّث أرصدة الكل)',v:s.ticket,t:'number'},{k:'win',l:'هدف الفوز',v:s.win,t:'number'},{k:'bb',l:'البيج بلايند (من اليد الجاية)',v:s.bb,t:'number'},{k:'maxPlayers',l:'أقصى عدد لاعبين',v:s.maxPlayers,t:'number'},{k:'minPlayers',l:'أقل عدد لبدء اللعبة',v:s.minPlayers,t:'number'}],v=>rc('settings',{ticket:+v.ticket,win:+v.win,bb:+v.bb,maxPlayers:+v.maxPlayers,minPlayers:+v.minPlayers}));
   case'chips':return rc('setChips',{pid,chips:+tr.querySelector('.chipIn').value});
   case'fold':return rc('act',{pid,type:'fold'});
   case'check':return rc('act',{pid,type:pl&&s.cur>pl.bet?'call':'check'});
@@ -230,7 +235,9 @@ function cardDlg(title,n,cur,ok){
 }
 
 /* ---- الإعدادات ---- */
-function buildSettings(){
+function syncQuick(){if(document.activeElement!==$('qMin'))$('qMin').value=VALUES.minPlayers;if(document.activeElement!==$('qMax'))$('qMax').value=VALUES.maxPlayers}
+$('qSave').onclick=()=>cmd('settings:set',{patch:{minPlayers:+$('qMin').value,maxPlayers:+$('qMax').value}});
+function buildSettings(){syncQuick();
  const groups=[...new Set(SCHEMA.map(s=>s.g))];
  $('settings').innerHTML=groups.map(g=>`<div class="sec">${esc(g)}</div><div class="fg">`+SCHEMA.filter(s=>s.g===g).map(s=>{
   const v=VALUES[s.k];let inp;

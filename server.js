@@ -52,7 +52,7 @@ for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { saveRooms(); pr
 /* إعدادات الواجهة العامة (بدون أي شي سري) */
 app.get('/config.json', (q, s) => s.json({
   title: cfg.title, accent: cfg.accent, defaultTicket: cfg.defaultTicket, winMult: cfg.winMult, minPlayers: cfg.minPlayers,
-  minTicket: cfg.minTicket, allowWebCreate: cfg.allowWebCreate, maintenance: cfg.maintenance, maintenanceMsg: cfg.maintenanceMsg
+  minTicket: cfg.minTicket, maxPlayers: cfg.maxPlayers, adminLogin: !!process.env.DISCORD_CLIENT_SECRET, allowWebCreate: cfg.allowWebCreate, maintenance: cfg.maintenance, maintenanceMsg: cfg.maintenanceMsg
 }));
 
 app.disable('x-powered-by');
@@ -130,11 +130,9 @@ if (process.env.DISCORD_TOKEN) {
       adminId: ADMIN_ID, issueAdminLink: adminPanel.issueLink
     });
   } catch (e) { console.error('تعذّر تشغيل البوت:', e.message); }
-} else {
-  // بدون بوت: رابط دخول محلي يظهر في الكونسول فقط
-  const l = adminPanel.issueLink(ADMIN_ID);
-  if (l) console.log('🔑 رابط دخول لوحة التحكم (صالح 5 دقائق):', l);
 }
+// رابط دخول احتياطي في الكونسول (صالح 5 دقائق، لمرة وحدة) — لو الأمر /admin ما ظهر
+setTimeout(() => { const l = adminPanel.issueLink(ADMIN_ID); if (l) console.log('🔑 رابط دخول لوحة التحكم (5 دقائق، مرة وحدة):', l); }, 2500);
 
 process.on('unhandledRejection', e => console.error('unhandledRejection:', e));
 srv.listen(PORT, () => console.log('Poker on :' + PORT));

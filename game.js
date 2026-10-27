@@ -87,6 +87,8 @@ function createEngine(hooks = {}, timing = {}, config) {
     get idle() { return timing.idle ?? cfg.idleMin * 60000; }
   };
   const HNs = () => (Array.isArray(cfg.handNames) && cfg.handNames.length === 9 ? cfg.handNames : HN);
+  const maxP = r => r.maxPlayers || cfg.maxPlayers;
+  const minP = r => r.minPlayers || cfg.minPlayers;
   const calcBB = ticket => Math.max(2, Math.round(ticket / cfg.bbDivisor) * 2);
   const rooms = new Map();
   const call = (name, ...a) => { try { if (hooks[name]) hooks[name](...a); } catch (e) { console.error('hook ' + name + ':', e); } };
@@ -124,7 +126,7 @@ function createEngine(hooks = {}, timing = {}, config) {
       pot: r.players.reduce((s, p) => s + p.tot, 0),
       turn: r.players[r.turn] ? r.players[r.turn].id : undefined,
       left: r.paused ? 0 : Math.max(0, r.deadline - Date.now()), msg: r.paused ? '⏸ الطاولة متوقفة مؤقتاً من الإدارة' : r.msg,
-      mh: (me.in && me.hand.length && r.phase !== 'lobby') ? myHand(r, me, HNs()) : '', minp: cfg.minPlayers, rk: r.ranks || [], paused: !!r.paused,
+      mh: (me.in && me.hand.length && r.phase !== 'lobby') ? myHand(r, me, HNs()) : '', minp: minP(r), maxp: maxP(r), rk: r.ranks || [], paused: !!r.paused,
       players: r.players.map((p, i) => {
         const show = p === me || (sd && p.in && !p.folded);
         return {
@@ -285,8 +287,12 @@ function createEngine(hooks = {}, timing = {}, config) {
   }
 
   /* ---------- واجهة المحرك ---------- */
-  function createRoom({ ticket, win, meta } = {}) {
+  function createRoom({ ticket, win, meta, maxPlayers, minPlayers } = {}) {
     ticket = Math.floor(+ticket); win = Math.floor(+win);
+    const okN = v => Number.isInteger(v) && v >= 2 && v <= 12;
+    maxPlayers = maxPlayers == null ? null : Math.floor(+maxPlayers); minPlayers = minPlayers == null ? null : Math.floor(+minPlayers);
+    if ((maxPlayers != null && !okN(maxPlayers)) || (minPlayers != null && !okN(minPlayers))) throw new GameError('عدد اللاعبين لازم من 2 إلى 12');
+    if ((minPlayers || cfg.minPlayers) > (maxPlayers || cfg.maxPlayers)) throw new GameError('الحد الأدنى للاعبين أكبر من الأقصى');
     if (cfg.maintenance && !(meta && meta.admin)) throw new GameError(cfg.maintenanceMsg || 'اللعبة تحت الصيانة');
     if (!(ticket >= cfg.minTicket && ticket <= cfg.maxTicket)) throw new GameError('تذكرة الدخول لازم تكون من ' + cfg.minTicket.toLocaleString('en') + ' إلى ' + cfg.maxTicket.toLocaleString('en'));
     if (!(win > ticket && win <= cfg.maxWin)) throw new GameError('رصيد الفوز لازم يكون أكبر من تذكرة الدخول' + (win > cfg.maxWin ? ' وأقل من ' + cfg.maxWin.toLocaleString('en') : ''));
@@ -294,7 +300,7 @@ function createEngine(hooks = {}, timing = {}, config) {
     let code;
     do { code = Array.from({ length: 4 }, () => CODE_CHARS[randomInt(CODE_CHARS.length)]).join(''); } while (rooms.has(code));
     const r = {
-      code, meta: meta || {}, players: [], phase: 'lobby', board: [], cur: 0, minRaise: 0,
+      code, meta: meta || {}, maxPlayers, minPlayers, players: [], phase: 'lobby', board: [], cur: 0, minRaise: 0,
       bb: calcBB(ticket), ticket, win, turn: -1, dealer: -1, deadline: 0,
       msg: '', ranks: RANKS_ALL.slice(), paused: false, t: null, gc: null, hands: 0, startedAt: 0, lastWinner: null, over: false, reveal: false
     };
@@ -316,7 +322,7 @@ function createEngine(hooks = {}, timing = {}, config) {
     if (r.phase !== 'lobby') throw new GameError('اللعبة بدأت — ما تقدر تنضم الحين');
     if (!name) throw new GameError('اكتب اسمك');
     if (cfg.bannedNames.some(b => b.toLowerCase() === name.toLowerCase())) throw new GameError('هذا الاسم ممنوع');
-    if (r.players.length >= cfg.maxPlayers) throw new GameError('الطاولة ممتلئة (الحد ' + cfg.maxPlayers + ')');
+    if (r.players.length >= maxP(r)) throw new GameError('الطاولة ممتلئة (الحد ' + maxP(r) + ')');
     p = mkP(pid, sid, name, r.ticket);
     r.players.push(p);
     send(r); changed(r);
@@ -333,7 +339,7 @@ function createEngine(hooks = {}, timing = {}, config) {
 
   function start(r, force) {
     if (r.phase !== 'lobby') throw new GameError('اللعبة جارية');
-    const need = force ? 2 : cfg.minPlayers;
+    const need = force ? 2 : minP(r);
     if (r.players.filter(p => p.chips > 0).length < need) throw new GameError('لازم ' + need + ' لاعبين على الأقل');
     r.startedAt = Date.now(); r.hands = 0; r.lastWinner = null;
     startHand(r);
@@ -355,7 +361,7 @@ function createEngine(hooks = {}, timing = {}, config) {
     // كل شي عن الطاولة بما فيها أوراق اللاعبين
     snapshot(r) {
       return {
-        code: r.code, ranks: r.ranks || [], phase: r.phase, paused: !!r.paused, ticket: r.ticket, win: r.win, bb: r.bb, cur: r.cur, minRaise: r.minRaise,
+        code: r.code, maxPlayers: maxP(r), minPlayers: minP(r), ranks: r.ranks || [], phase: r.phase, paused: !!r.paused, ticket: r.ticket, win: r.win, bb: r.bb, cur: r.cur, minRaise: r.minRaise,
         pot: r.players.reduce((s, p) => s + p.tot, 0), board: r.board, msg: r.msg, hands: r.hands, dealer: r.dealer,
         turn: r.players[r.turn] ? r.players[r.turn].id : null, left: Math.max(0, r.deadline - Date.now()),
         host: hostOf(r), by: (r.meta && (r.meta.creatorName || r.meta.creatorId)) || '', source: (r.meta && r.meta.source) || (r.meta && r.meta.creatorId ? 'discord' : ''),
@@ -367,6 +373,12 @@ function createEngine(hooks = {}, timing = {}, config) {
       };
     },
     settings(r, o = {}) {
+      if (o.maxPlayers !== undefined || o.minPlayers !== undefined) {
+        const mx = o.maxPlayers !== undefined ? Math.floor(+o.maxPlayers) : maxP(r), mn = o.minPlayers !== undefined ? Math.floor(+o.minPlayers) : minP(r);
+        if (!(mx >= 2 && mx <= 12 && mn >= 2 && mn <= 12)) throw new GameError('عدد اللاعبين لازم من 2 إلى 12');
+        if (mn > mx) throw new GameError('الحد الأدنى للاعبين أكبر من الأقصى');
+        r.maxPlayers = mx; r.minPlayers = mn;
+      }
       if (o.ticket !== undefined) {
         const t = Math.floor(+o.ticket);
         if (!(t >= 1 && t <= 1e12)) throw new GameError('تذكرة غير صالحة');
@@ -487,7 +499,7 @@ function createEngine(hooks = {}, timing = {}, config) {
   };
 
   /* ---------- حفظ/استرجاع الطاولات عند إعادة تشغيل السيرفر ---------- */
-  const KEEP = ['code', 'meta', 'phase', 'board', 'cur', 'minRaise', 'bb', 'ticket', 'win', 'turn', 'dealer', 'msg', 'hands', 'startedAt', 'lastWinner', 'over', 'reveal', 'ranks', 'deck', 'paused'];
+  const KEEP = ['code', 'meta', 'phase', 'board', 'cur', 'minRaise', 'maxPlayers', 'minPlayers', 'bb', 'ticket', 'win', 'turn', 'dealer', 'msg', 'hands', 'startedAt', 'lastWinner', 'over', 'reveal', 'ranks', 'deck', 'paused'];
   function exportRooms() {
     return [...rooms.values()].map(r => {
       const o = {}; KEEP.forEach(k => { o[k] = r[k]; });

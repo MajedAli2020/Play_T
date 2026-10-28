@@ -167,7 +167,7 @@ function renderDetail(){
   <td><div class="row" style="flex-wrap:nowrap"><input type="number" class="chipIn" value="${p.chips}" style="width:110px" min="0"><button class="btn sm k" data-a="chips">حفظ</button></div><div class="mut small">رهان ${fmt(p.bet)} • إجمالي ${fmt(p.tot)}</div></td>
   <td><div class="acts">
    ${p.id===s.turn?'<button class="btn sm" data-a="fold">انسحاب</button><button class="btn sm" data-a="check">تمرير/مساومة</button><button class="btn sm" data-a="allin">كل شي</button>':''}
-   ${p.hand&&p.hand.length===2?'<button class="btn sm b" data-a="cards">🃏 أوراق</button>':''}
+   ${p.hand&&p.hand.length>=2?'<button class="btn sm b" data-a="cards">🃏 أوراق</button>':''}
    <button class="btn sm" data-a="rename">اسم</button><button class="btn sm" data-a="host">منظّم</button>
    <button class="btn sm g" data-a="winner">🏆 فائز</button>
    <button class="btn sm r" data-a="kick">طرد</button><button class="btn sm r" data-a="ban">حظر</button></div></td></tr>`).join('');
@@ -213,7 +213,7 @@ $('detail').onclick=async e=>{
   case'winner':if(confirm('إعلان '+pl.name+' فائز وإنهاء المباراة؟'))rc('winner',{pid});return;
   case'kick':if(confirm('طرد '+pl.name+'؟'))rc('kick',{pid});return;
   case'ban':if(confirm('طرد وحظر '+pl.name+' من اللعبة كلها؟'))rc('kick',{pid,ban:true});return;
-  case'cards':return cardDlg('أوراق '+pl.name,2,pl.hand,h=>rc('cards',{pid,hand:h}));
+  case'cards':return cardDlg('أوراق '+pl.name,pl.hand.length,pl.hand,h=>rc('cards',{pid,hand:h}));
   case'boardCards':return cardDlg('أوراق الطاولة',s.board.length,s.board,bd=>rc('cards',{board:bd}));
  }};
 
@@ -227,7 +227,7 @@ function ask(title,fields,ok){
 }
 function cardDlg(title,n,cur,ok){
  const f=$('dform');
- const opt=(i,c)=>`<div class="cp" data-i="${i}"><select class="cr">${((SNAP&&SNAP.ranks&&SNAP.ranks.length)?SNAP.ranks:[14,13,12,11,10,9,8,7]).map(r=>`<option value="${r}" ${c&&c.r===r?'selected':''}>${RK[r]||r}</option>`).join('')}</select><select class="cs">${SU.map((x,k)=>`<option value="${k}" ${c&&c.s===k?'selected':''}>${x}</option>`).join('')}</select>${pc(c)}</div>`;
+ const opt=(i,c)=>`<div class="cp" data-i="${i}"><select class="cr">${((SNAP&&SNAP.ranks&&SNAP.ranks.length)?SNAP.ranks:[14,13,12,11,10,9,8,7,6,5,4,3,2]).map(r=>`<option value="${r}" ${c&&c.r===r?'selected':''}>${RK[r]||r}</option>`).join('')}</select><select class="cs">${SU.map((x,k)=>`<option value="${k}" ${c&&c.s===k?'selected':''}>${x}</option>`).join('')}</select>${pc(c)}</div>`;
  f.innerHTML=`<h2 style="margin-bottom:6px;color:var(--gold2)">${esc(title)}</h2><p class="mut small">اختر الأوراق — السيرفر يرفض لو الورقة موجودة عند لاعب ثاني أو في الطاولة.</p>`+Array.from({length:n},(_,i)=>opt(i,cur[i])).join('')+
  '<div class="row" style="margin-top:10px"><button class="btn g" value="ok">تطبيق</button><button class="btn" value="cancel">إلغاء</button></div>';
  $('dlg').onclose=()=>{if($('dlg').returnValue==='ok')ok([...f.querySelectorAll('.cp')].map(p=>({r:+p.querySelector('.cr').value,s:+p.querySelector('.cs').value})))};

@@ -18,7 +18,8 @@ const cmp = (a, b) => {
 };
 
 // الورق: أكه شايب بنت ولد عشرة تسعة ثمانية سبعة (حسب عدد اللاعبين)
-const RANKS_ALL = [14, 13, 12, 11, 10, 9, 8, 7];
+const RANKS_ALL = [14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2];
+const MAX_PLAYERS = 11; // 4 أوراق لكل لاعب + ٥ على الطاولة من ٥٢ ورقة
 
 function newDeck(ranks = RANKS_ALL) {
   const d = [];
@@ -51,28 +52,34 @@ function ev5(c) {
   return [cat, ...rk];
 }
 
+// أفضل ٥ أوراق من أي عدد أوراق (٥ فأكثر)
 function best(c) {
   let b = null;
-  for (let i = 0; i < c.length; i++)
-    for (let j = i + 1; j < c.length; j++) {
-      const v = ev5(c.filter((_, k) => k !== i && k !== j));
-      if (!b || cmp(v, b) > 0) b = v;
-    }
+  const pick = [];
+  (function rec(i) {
+    if (pick.length === 5) { const v = ev5(pick); if (!b || cmp(v, b) > 0) b = v; return; }
+    if (c.length - i < 5 - pick.length) return;
+    pick.push(c[i]); rec(i + 1); pick.pop(); rec(i + 1);
+  })(0);
   return b;
+}
+
+// اسم اليد قبل ما تكتمل ٥ أوراق (زوج/زوجين/ثلاثة/أربعة)
+function partialCat(c) {
+  const n = {};
+  c.forEach(x => n[x.r] = (n[x.r] || 0) + 1);
+  const v = Object.values(n).sort((a, b) => b - a);
+  if (v[0] === 4) return 7;
+  if (v[0] === 3) return 3;
+  if (v[0] === 2 && v[1] === 2) return 2;
+  if (v[0] === 2) return 1;
+  return 0;
 }
 
 function myHand(r, p, HN) {
   const c = [...p.hand, ...r.board];
-  if (c.length < 5) return p.hand[0].r === p.hand[1].r ? HN[1] : HN[0];
-  let b = null;
-  if (c.length === 5) b = ev5(c);
-  else if (c.length === 6) {
-    for (let i = 0; i < 6; i++) {
-      const v = ev5(c.filter((_, k) => k !== i));
-      if (!b || cmp(v, b) > 0) b = v;
-    }
-  } else b = best(c);
-  return HN[b[0]];
+  if (c.length < 5) return HN[partialCat(c)];
+  return HN[best(c)[0]];
 }
 
 /* ---------- المحرك ---------- */
@@ -125,7 +132,7 @@ function createEngine(hooks = {}, timing = {}, config) {
       ticket: r.ticket, win: r.win, board: r.board, cur: r.cur, minRaise: r.minRaise,
       pot: r.players.reduce((s, p) => s + p.tot, 0),
       turn: r.players[r.turn] ? r.players[r.turn].id : undefined,
-      left: r.paused ? 0 : Math.max(0, r.deadline - Date.now()), msg: r.paused ? '⏸ الطاولة متوقفة مؤقتاً من الإدارة' : r.msg,
+      left: r.paused ? 0 : Math.max(0, r.deadline - Date.now()), tt: T.turn, msg: r.paused ? '⏸ الطاولة متوقفة مؤقتاً من الإدارة' : r.msg,
       mh: (me.in && me.hand.length && r.phase !== 'lobby') ? myHand(r, me, HNs()) : '', minp: minP(r), maxp: maxP(r), rk: r.ranks || [], paused: !!r.paused,
       players: r.players.map((p, i) => {
         const show = p === me || (sd && p.in && !p.folded);
@@ -191,15 +198,17 @@ function createEngine(hooks = {}, timing = {}, config) {
     }
     r.hands = (r.hands || 0) + 1;
     // عدد رتب الورق = عدد اللاعبين (٤ → أكه شايب بنت ولد، ٥ تزيد العشرة، … ٨ → لين السبعة)
+    const H = cfg.holeCards;
+    if (H * n + 5 > 52) throw new GameError('عدد اللاعبين كبير على ' + H + ' أوراق لكل لاعب');
     let k = cfg.deckByPlayers ? Math.min(cfg.maxRanks, Math.max(cfg.minRanks, n)) : cfg.maxRanks;
-    while (4 * k < 2 * n + 5 && k < 8) k++;
+    while (4 * k < H * n + 5 && k < 13) k++;
     r.ranks = RANKS_ALL.slice(0, k);
     r.deck = newDeck(r.ranks); r.board = []; r.msg = ''; r.reveal = false;
     r.dealer = nxt(r, r.dealer, p => p.in);
     const sb = n === 2 ? r.dealer : nxt(r, r.dealer, p => p.in), bbI = nxt(r, sb, p => p.in);
-    r.players.forEach(p => { if (p.in) p.hand = [r.deck.pop(), r.deck.pop()]; });
+    r.players.forEach(p => { if (p.in) p.hand = Array.from({ length: cfg.holeCards }, () => r.deck.pop()); });
     pay(r.players[sb], Math.max(1, Math.floor(r.bb * cfg.sbRatio))); pay(r.players[bbI], r.bb);
-    r.cur = r.bb; r.minRaise = r.bb; r.phase = 'preflop'; r.turn = bbI;
+    r.cur = r.bb; r.minRaise = cfg.raiseStep; r.phase = 'preflop'; r.turn = bbI;
     step(r);
   }
 
@@ -208,7 +217,7 @@ function createEngine(hooks = {}, timing = {}, config) {
     const p = r.players[r.turn];
     r.deadline = Date.now() + T.turn;
     r.t = setTimeout(() => {
-      if (r.players[r.turn] === p) act0(r, p, p.bet < r.cur ? 'fold' : 'check');
+      if (r.players[r.turn] === p) act0(r, p, 'fold'); // انتهى الوقت = يطلع من الجولة
     }, p.left ? Math.min(400, T.turn) : T.turn + 200);
     send(r);
   }
@@ -221,7 +230,7 @@ function createEngine(hooks = {}, timing = {}, config) {
       return turnStart(r);
     }
     r.players.forEach(p => { p.bet = 0; p.acted = false; });
-    r.cur = 0; r.minRaise = r.bb;
+    r.cur = 0; r.minRaise = cfg.raiseStep;
     if (r.phase === 'river') return showdown(r);
     r.phase = { preflop: 'flop', flop: 'turn', turn: 'river' }[r.phase];
     for (let i = 0; i < (r.phase === 'flop' ? 3 : 1); i++) r.board.push(r.deck.pop());
@@ -235,14 +244,18 @@ function createEngine(hooks = {}, timing = {}, config) {
     if (type === 'fold') p.folded = true;
     else if (type === 'check' || type === 'call') pay(p, to);
     else if (type === 'allin' || type === 'raise') {
-      const mx = p.chips + p.bet;
-      let t = type === 'allin' ? mx : Math.floor(+amt || 0);
-      t = Math.max(Math.min(t, mx), Math.min(r.cur + r.minRaise, mx));
+      // الرفع: أقل شي 100 وبعدها زيادات 100 بدون حد أعلى (لين كل فلوسه)
+      const mx = p.chips + p.bet, st = cfg.raiseStep;
+      let t;
+      if (type === 'allin') t = mx;
+      else {
+        const inc = Math.max(st, Math.ceil(((Math.floor(+amt) || 0) - r.cur) / st) * st);
+        t = Math.min(r.cur + inc, mx);
+      }
       if (t <= r.cur) pay(p, to);
       else {
-        const inc = t - r.cur;
         pay(p, t - p.bet);
-        if (inc >= r.minRaise) r.minRaise = inc;
+        r.minRaise = st;
         r.cur = t;
         r.players.forEach(o => { if (o !== p) o.acted = false; });
       }
@@ -289,9 +302,9 @@ function createEngine(hooks = {}, timing = {}, config) {
   /* ---------- واجهة المحرك ---------- */
   function createRoom({ ticket, win, meta, maxPlayers, minPlayers } = {}) {
     ticket = Math.floor(+ticket); win = Math.floor(+win);
-    const okN = v => Number.isInteger(v) && v >= 2 && v <= 12;
+    const okN = v => Number.isInteger(v) && v >= 2 && v <= MAX_PLAYERS;
     maxPlayers = maxPlayers == null ? null : Math.floor(+maxPlayers); minPlayers = minPlayers == null ? null : Math.floor(+minPlayers);
-    if ((maxPlayers != null && !okN(maxPlayers)) || (minPlayers != null && !okN(minPlayers))) throw new GameError('عدد اللاعبين لازم من 2 إلى 12');
+    if ((maxPlayers != null && !okN(maxPlayers)) || (minPlayers != null && !okN(minPlayers))) throw new GameError('عدد اللاعبين لازم من 2 إلى ' + MAX_PLAYERS);
     if ((minPlayers || cfg.minPlayers) > (maxPlayers || cfg.maxPlayers)) throw new GameError('الحد الأدنى للاعبين أكبر من الأقصى');
     if (cfg.maintenance && !(meta && meta.admin)) throw new GameError(cfg.maintenanceMsg || 'اللعبة تحت الصيانة');
     if (!(ticket >= cfg.minTicket && ticket <= cfg.maxTicket)) throw new GameError('تذكرة الدخول لازم تكون من ' + cfg.minTicket.toLocaleString('en') + ' إلى ' + cfg.maxTicket.toLocaleString('en'));
@@ -341,6 +354,7 @@ function createEngine(hooks = {}, timing = {}, config) {
     if (r.phase !== 'lobby') throw new GameError('اللعبة جارية');
     const need = force ? 2 : minP(r);
     if (r.players.filter(p => p.chips > 0).length < need) throw new GameError('لازم ' + need + ' لاعبين على الأقل');
+    if (cfg.holeCards * r.players.filter(p => p.chips > 0).length + 5 > 52) throw new GameError('عدد اللاعبين كبير على ' + cfg.holeCards + ' أوراق لكل لاعب');
     r.startedAt = Date.now(); r.hands = 0; r.lastWinner = null;
     startHand(r);
     changed(r);
@@ -375,7 +389,7 @@ function createEngine(hooks = {}, timing = {}, config) {
     settings(r, o = {}) {
       if (o.maxPlayers !== undefined || o.minPlayers !== undefined) {
         const mx = o.maxPlayers !== undefined ? Math.floor(+o.maxPlayers) : maxP(r), mn = o.minPlayers !== undefined ? Math.floor(+o.minPlayers) : minP(r);
-        if (!(mx >= 2 && mx <= 12 && mn >= 2 && mn <= 12)) throw new GameError('عدد اللاعبين لازم من 2 إلى 12');
+        if (!(mx >= 2 && mx <= MAX_PLAYERS && mn >= 2 && mn <= MAX_PLAYERS)) throw new GameError('عدد اللاعبين لازم من 2 إلى ' + MAX_PLAYERS);
         if (mn > mx) throw new GameError('الحد الأدنى للاعبين أكبر من الأقصى');
         r.maxPlayers = mx; r.minPlayers = mn;
       }
@@ -441,7 +455,7 @@ function createEngine(hooks = {}, timing = {}, config) {
       const p = r.players[r.turn], ms = Math.max(1, Math.min(600, +sec || 10)) * 1000;
       clearTimeout(r.t);
       r.deadline = Date.now() + ms;
-      r.t = setTimeout(() => { if (r.players[r.turn] === p) act0(r, p, p.bet < r.cur ? 'fold' : 'check'); }, ms + 200);
+      r.t = setTimeout(() => { if (r.players[r.turn] === p) act0(r, p, 'fold'); }, ms + 200);
       send(r);
     },
     pause(r) {
@@ -477,7 +491,7 @@ function createEngine(hooks = {}, timing = {}, config) {
       let target;
       if (hand) {
         const p = P(r, pid);
-        if (!p.hand.length || hand.length !== 2) throw new GameError('لازم ورقتين لهذا اللاعب');
+        if (!p.hand.length || hand.length !== p.hand.length) throw new GameError('لازم ' + p.hand.length + ' أوراق لهذا اللاعب');
         target = p.hand; if (!hand.every(c => cardOk(c, r))) throw new GameError('ورقة غير صالحة');
       } else if (board) {
         if (board.length !== r.board.length || !board.every(c => cardOk(c, r))) throw new GameError('لازم ' + r.board.length + ' أوراق للطاولة');

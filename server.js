@@ -101,7 +101,7 @@ io.on('connection', s => {
     if (!name) throw new GameError('اكتب اسمك');
     const id = cleanPid(d.pid) || s.id;
     if (!cfg.allowWebCreate) throw new GameError('إنشاء الطاولات من الموقع مقفل — استخدم /poker في ديسكورد');
-    const r = engine.createRoom({ ticket: d.ticket, win: d.win, meta: { creatorName: name, hostPid: id, source: 'web' } });
+    const r = engine.createRoom({ ticket: d.ticket, win: d.win, maxPlayers: +d.players || 4, minPlayers: +d.players || 4, meta: { creatorName: name, hostPid: id, source: 'web' } });
     try { engine.join(r, s.id, id, name); } catch (e) { engine.destroy(r, 'error'); throw e; }
     room = r; pid = id; s.join(r.code);
   });

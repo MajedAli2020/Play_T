@@ -21,8 +21,8 @@ function start({ engine, cfg, token, guildId, adminId, issueAdminLink }) {
   const command = new SlashCommandBuilder()
     .setName('poker').setDescription('افتح طاولة بوكر جديدة')
     .addIntegerOption(o => o.setName('ticket').setDescription('تذكرة الدخول (رصيد كل لاعب) — الافتراضي 10000').setMinValue(20).setMaxValue(1000000000))
-    .addIntegerOption(o => o.setName('players').setDescription('أقصى عدد لاعبين في الطاولة (2-12)').setMinValue(2).setMaxValue(12))
-    .addIntegerOption(o => o.setName('min').setDescription('أقل عدد لاعبين لبدء اللعبة (2-12)').setMinValue(2).setMaxValue(12))
+    .addIntegerOption(o => o.setName('players').setDescription('أقصى عدد لاعبين في الطاولة (2-11)').setMinValue(2).setMaxValue(11))
+    .addIntegerOption(o => o.setName('min').setDescription('أقل عدد لاعبين لبدء اللعبة (2-11)').setMinValue(2).setMaxValue(11))
     .addIntegerOption(o => o.setName('win').setDescription('رصيد الفوز (يفوز أول من يوصله) — الافتراضي ثلاثة أضعاف التذكرة').setMinValue(40).setMaxValue(1000000000000));
   const adminCommand = new SlashCommandBuilder().setName('admin').setDescription('لوحة التحكم (للمالك فقط)');
 

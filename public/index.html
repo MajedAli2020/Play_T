@@ -23,7 +23,7 @@ button{font-family:inherit;cursor:pointer}
 #game{position:relative;width:100%;max-width:1600px;height:100dvh;margin:0 auto;overflow:hidden;background:linear-gradient(#262e52,#151a30 22%,#151a30 78%,#2a1d11)}
 #rug{position:absolute;inset:12px 12px 150px;border-radius:50%/48%;border:3px solid var(--line);box-shadow:inset 0 0 70px #5a431eaa,0 0 40px #000a;background:radial-gradient(ellipse at 50% 45%,#dfcd9f,#c6af7e 70%,#a58c5a);overflow:hidden}
 #rug::before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(45deg,#8a6a2c26 0 2px,transparent 2px 30px),repeating-linear-gradient(-45deg,#8a6a2c26 0 2px,transparent 2px 30px)}
-#table{position:absolute;inset:0 0 146px 0}
+#table{position:absolute;inset:60px 0 146px 0}
 .rb{position:absolute;left:12px;width:46px;height:46px;border-radius:50%;border:3px solid #6b4510;background:radial-gradient(#f2c466,#a8741f);font-size:1.2rem;box-shadow:0 3px 6px #000a;z-index:6}
 #rules{position:absolute;top:10px;right:12px;z-index:5;width:170px;background:#2e2016ee;border-top:3px solid #a8741f;border-radius:6px;padding:7px 9px;font-size:.8rem;text-align:center;box-shadow:0 4px 12px #000a}
 .pill{display:flex;align-items:center;justify-content:space-between;background:#120c08;border-radius:16px;padding:2px 8px;margin:2px 0 5px;font-weight:800;font-size:.95rem}
@@ -80,6 +80,66 @@ svg.c{display:block;padding:0;background:none;box-shadow:0 2px 5px #0008;border-
 @media(max-width:700px){#bar{flex-wrap:wrap;min-height:170px}.kb{min-width:90px;padding:10px}#rug{bottom:190px}#table{bottom:186px}}
 #adm{position:fixed;bottom:12px;left:12px;z-index:98;background:linear-gradient(#ffe08a,#e7b84b 55%,#b9821a);color:#3a2400;border:2px solid #fff1b8;border-radius:12px;padding:8px 14px;font-weight:800;font-size:.9rem;text-decoration:none;box-shadow:0 3px 10px #000a}
 #admin-in{color:#8d7550;font-size:.75rem;text-align:center;text-decoration:none}
+
+/* ===== نسخة واقعية ===== */
+body{background:radial-gradient(ellipse at 50% 30%,#2a1f2e,#120d16 60%,#07050a)}
+#game{background:radial-gradient(ellipse at 50% 38%,#3a2a33 0,#1a1219 55%,#08050b 100%)}
+#game::before{content:"";position:absolute;inset:0;background:radial-gradient(ellipse 60% 55% at 50% 42%,#ffe9b022,transparent 70%);pointer-events:none;z-index:1}
+#rug{inset:60px 14px 150px;border:0;border-radius:50%/48%;background:
+ linear-gradient(135deg,#7a4a22 0%,#3b2010 30%,#6b3d1a 55%,#2c180b 80%,#5a3216 100%);
+ box-shadow:0 30px 60px #000c,0 0 0 3px #1a0d05,inset 0 0 0 2px #c58a4a55,inset 0 3px 8px #ffd9a055}
+#rug::before{inset:20px;border-radius:50%/48%;background:
+ radial-gradient(ellipse at 50% 40%,#2a9a63 0%,#1b7a4b 40%,#0e5233 80%,#093a24 100%);
+ box-shadow:inset 0 0 60px #000c,inset 0 0 0 3px #0a3220,0 0 0 3px #c9a24a66;opacity:1}
+#rug::after{content:"♠ رويال بوكر ♠";position:absolute;left:50%;top:58%;transform:translate(-50%,-50%);font-weight:800;font-size:clamp(1.2rem,3.2vw,3rem);color:#ffffff14;letter-spacing:.1em;white-space:nowrap;text-shadow:0 2px 0 #00000022;pointer-events:none}
+.rb{background:radial-gradient(#ffe08a,#a8741f);border-color:#4a2f08}
+#rules{background:linear-gradient(#2e2016ee,#150e09ee);border:1px solid #8a6a2c;border-top:3px solid var(--gold);color:#f3e4b8}
+#msg{font-size:1rem;color:#fff6d8;text-shadow:0 2px 4px #000;background:#0008;padding:3px 12px;border-radius:12px}
+#msg:empty{display:none}
+#pot{background:#000a;border:1px solid #d9a44188;box-shadow:0 4px 14px #000a}
+/* ورق */
+.c.b,svg.c.b{background:#14356b;border:2px solid #f3ead0;background-image:repeating-linear-gradient(45deg,#c8a24a55 0 2px,transparent 2px 7px),repeating-linear-gradient(-45deg,#c8a24a55 0 2px,transparent 2px 7px),radial-gradient(circle at 50% 50%,#1d4f9a,#0d2550);box-shadow:0 3px 6px #000a,inset 0 0 0 2px #14356b}
+svg.c.cd{box-shadow:0 4px 10px #000b,0 1px 0 #fff inset}
+#board .c.e{background:#00000030;border:2px dashed #ffffff30;border-radius:6px}
+@keyframes fly{from{opacity:0;transform:translate(0,-120px) scale(.4) rotate(-20deg)}to{opacity:1}}
+@keyframes flip{from{opacity:0;transform:translateY(-30px) rotateY(90deg) scale(.8)}to{opacity:1}}
+.fly{animation:fly .45s cubic-bezier(.2,.8,.3,1) both}.flip{animation:flip .5s ease-out both}
+/* مقاعد */
+.av{background-image:linear-gradient(#ffffff30,transparent 55%);border:3px solid #e0b255;box-shadow:0 4px 10px #000c,inset 0 -6px 10px #0006}
+.avw{background:linear-gradient(#0008,#0004)}
+.nb{background:linear-gradient(#000d,#000a);border:1px solid #ffffff1a;border-radius:8px 8px 0 0}
+.cb{background:linear-gradient(#150e09,#000d);border:1px solid #d9a44155;border-radius:0 0 8px 8px;color:#ffe9b0}
+.seat.me .nb,.seat.me .cb{border-color:#e040fb88}
+.seat.turn .nb{border-color:#ffb347}
+.seat.won .pf{animation:pulse 1s ease-in-out infinite}
+@keyframes pulse{50%{filter:drop-shadow(0 0 14px #ffe08a)}}
+.dl{background:radial-gradient(#fff,#ddd);color:#111;border:2px solid #999;box-shadow:0 2px 5px #000a}
+/* فيشات */
+.stks{display:flex;gap:3px;align-items:flex-end}
+.stk{display:flex;flex-direction:column-reverse}
+.ch{display:block;width:24px;height:9px;margin-top:-5px;border-radius:50%;background:repeating-conic-gradient(#fff 0 12deg,var(--c) 12deg 45deg);border:1px solid #0008;box-shadow:0 2px 0 #0007,inset 0 0 0 3px var(--c)}
+.stk .ch:first-child{margin-top:0}
+.bet{background:none;border:0;padding:0;flex-direction:column;gap:2px;transform:translate(-50%,-50%)}
+.bet b{background:#000b;border:1px solid var(--gold);border-radius:10px;padding:0 8px;font-size:.78rem;color:var(--gold2)}
+#pot{flex-direction:row;gap:6px;border-radius:16px;padding:3px 16px;font-size:1.1rem}
+#pot .stks{min-height:22px}
+/* أزرار */
+.kb{border-radius:14px;box-shadow:inset 0 1px 0 #fff3,0 4px 0 #000a,0 8px 14px #0008}
+.kb:active{transform:translateY(2px)}
+#bar{background:linear-gradient(#2a1d12,#0d0805);box-shadow:0 -10px 30px #000a}
+
+#act{position:absolute;top:8px;left:50%;transform:translateX(-50%);z-index:8;display:none;align-items:stretch;min-width:300px;max-width:92%;height:46px;border-radius:12px;overflow:hidden;background:#0b0f1cf0;border:1px solid #ffffff22;box-shadow:0 6px 18px #000b;direction:rtl}
+#act.on{display:flex;animation:actin .35s cubic-bezier(.2,.9,.3,1.2)}
+@keyframes actin{from{opacity:0;transform:translate(-50%,-14px) scale(.9)}}
+#act .k{display:grid;place-items:center;padding:0 18px;font-weight:800;font-size:1.05rem;color:#fff;background:var(--kc,#2f8a58);letter-spacing:.02em}
+#act .w{display:flex;align-items:center;padding:0 16px;flex:1;font-weight:800;font-size:1rem;color:#fff;gap:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#act .w small{font-weight:500;color:#9aa3c7;font-size:.75rem}
+#act .m{display:flex;align-items:center;gap:6px;padding:0 18px;font-weight:800;font-size:1.15rem;color:var(--gold2);background:#ffffff10;border-inline-start:1px solid #ffffff1a}
+.rkb{font-weight:800;font-size:.75rem;padding:1px 9px;border-radius:9px;background:#2a3350;color:#cfd6f5}
+.rkb.top{background:linear-gradient(#ffe08a,#e7b84b);color:#3a2400;box-shadow:0 0 14px #ffe08a99}
+.seat.top .av{border-color:#fff;box-shadow:0 0 24px var(--gold2)}
+.seat .hn{background:#000b;padding:1px 8px;border-radius:8px}
+.seat.rev:not(.me) .c{width:46px;height:64px}.seat.rev:not(.me) .c+.c{margin-inline-start:-18px}.seat.rev{width:150px}
 </style></head><body>
 <a id="adm" href="/admin" hidden>🛠️ لوحة التحكم</a>
 <div id="net" hidden></div><div id="home" class="box"><h1 id="ttl">رويال بوكر</h1><div id="mt" hidden style="background:#8a1020;border-radius:10px;padding:8px;text-align:center;font-weight:800"></div>
@@ -96,11 +156,11 @@ svg.c{display:block;padding:0;background:none;box-shadow:0 2px 5px #0008;border-
 
 <div id="game" hidden><div id="rug"></div>
 <button class="rb" id="bl" style="top:10px" aria-label="نسخ رابط الدعوة">🔗</button><button class="rb" id="bx" style="top:64px" aria-label="خروج">🚪</button>
-<div id="rules"></div>
+<div id="act"></div><div id="rules"></div>
 <div id="table"><div id="mid"><div id="pot"></div><div id="board"></div><div id="msg"></div></div><div id="seats"></div></div>
 <div id="bar"><div id="hp" hidden></div>
 <button id="fold" class="kb">انسحب</button><button id="call" class="kb">مساومة</button>
-<div id="rg"><div class="pre"><button data-p="min">الأدنى</button><button data-p=".5">½ البوت</button><button data-p="1">البوت</button><button data-p="max">الأقصى</button></div><div class="rr"><button id="rm" class="kb sm">−</button><input id="rs" type="range" step="1"><button id="rp" class="kb sm">+</button><input id="ri" type="number" step="100" inputmode="numeric"><button id="raise" class="kb"></button></div></div>
+<div id="rg"><div class="pre"><button data-p="min">الأدنى</button><button data-p=".5">½ الفلوس</button><button data-p="1">كل الفلوس</button><button data-p="max">الأقصى</button></div><div class="rr"><button id="rm" class="kb sm">−</button><input id="rs" type="range" step="1"><button id="rp" class="kb sm">+</button><input id="ri" type="number" step="100" inputmode="numeric"><button id="raise" class="kb"></button></div></div>
 <button id="allin" class="kb">كل شي</button></div></div>
 
 <script src="/socket.io/socket.io.js"></script>
@@ -127,6 +187,9 @@ const card=c=>{
  else if(PIPS[c.r])body=PIPS[c.r].map(([x,y])=>`<text x="${x}" y="${y}" font-size="12" fill="${col}" text-anchor="middle" dominant-baseline="central"${y>42?` transform="rotate(180 ${x} ${y})"`:''}>${su}</text>`).join('');
  else body=court(c.r,col);
  return `<svg class="c cd" viewBox="0 0 60 84" xmlns="http://www.w3.org/2000/svg"><rect x=".5" y=".5" width="59" height="83" rx="5" fill="#fbfaf5" stroke="#bdb59c" stroke-width="1"/>${idx}<g transform="rotate(180 30 42)">${idx}</g>${body}</svg>`};
+const CH=[[25000,'#7b3fc4'],[5000,'#222'],[1000,'#e0a31a'],[500,'#2b5fc7'],[100,'#c8261e'],[1,'#1f8f4a']];
+function chips(n){const o=[];let r=Math.floor(n);for(const[v,c]of CH){let k=Math.min(Math.floor(r/v),6);r%=v;if(k)o.push(`<div class="stk">${`<i class="ch" style="--c:${c}"></i>`.repeat(k)}</div>`)}return`<div class="stks">${o.slice(0,4).join('')}</div>`}
+let pBoard=0,pSig='',lastSeq=0;
 const coin='<span class="coin">♣</span>',hue=t=>[...t].reduce((a,c)=>a*31+c.charCodeAt(0),7)%360;
 const ls={get:k=>{try{return localStorage.getItem(k)}catch(e){return null}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}},del:k=>{try{localStorage.removeItem(k)}catch(e){}}};
 let pid=ls.get('rp_pid');if(!pid){pid=(crypto.randomUUID?crypto.randomUUID():Math.random().toString(36).slice(2)+Date.now().toString(36)+Math.random().toString(36).slice(2));ls.set('rp_pid',pid)}
@@ -179,15 +242,25 @@ function render(){
  const n=st.players.length,mi=st.players.indexOf(me);let h='';
  st.players.forEach((p,i)=>{const k=(i-mi+n)%n,a=Math.PI/2+k*2*Math.PI/n,x=k?50+43*Math.cos(a):50,y=k?48+31*Math.sin(a):99,t=p.id===st.turn,pc=Math.min(100,Math.round(p.chips/st.win*100));
   const cards=`<div class="cards">${p.hand.map(card).join('')}</div>`;
-  h+=`<div class="seat ${k?'':'me'} ${t?'turn':''} ${p.folded||!p.in?'out':''} ${p.win?'won':''}" style="left:${x}%;top:${y}%;transform:translate(-50%,${k?'-50%':'-100%'})">
+  h+=`<div class="seat ${k?'':'me'} ${t?'turn':''} ${p.folded||!p.in?'out':''} ${p.win?'won':''} ${p.rk===1?'top':''} ${k&&p.hand.length&&p.hand[0]!==0?'rev':''}" style="left:${x}%;top:${y}%;transform:translate(-50%,${k?'-50%':'-100%'})">
   ${k?'':cards}<div class="pf"><div class="avw"><div class="av" style="background:hsl(${hue(p.name)},35%,16%)">${esc([...p.name][0])}<div class="tn"></div>${p.dealer?'<em class="dl">موزع</em>':''}</div></div>
   <div class="nb"><b>${esc(p.name)}</b><i class="lv">${i+1}</i></div><div class="cb">${fmt(p.chips)}${coin}</div>
   <div class="pc"><u style="width:${pc}%"></u><span>${pc}%</span></div>
-  ${p.hn?`<div class="hn">${p.hn}</div>`:''}<div class="tags">${p.allin?'<span class="ai">كل شي</span>':''}${p.folded?'<span>انسحب</span>':''}${p.win?`<span class="w">+${fmt(p.win)}</span>`:''}</div></div>${k?cards:''}</div>`;
-  if(p.bet)h+=`<div class="bet" style="left:${50+(x-50)*.58}%;top:${48+((k?y:78)-48)*.58}%">${coin}${fmt(p.bet)}</div>`});
+  ${p.rk?`<div class="rkb ${p.rk===1?'top':''}">${p.rk===1?'👑 الأقوى':'المرتبة '+p.rk}</div>`:''}${p.hn?`<div class="hn">${p.hn}</div>`:''}<div class="tags">${p.allin?'<span class="ai">كل شي</span>':''}${p.folded?'<span>انسحب</span>':''}${p.win?`<span class="w">+${fmt(p.win)}</span>`:''}</div></div>${k?cards:''}</div>`;
+  if(p.tot)h+=`<div class="bet" style="left:${50+(x-50)*.58}%;top:${48+((k?y:78)-48)*.58}%"><b>${coin} ${fmt(p.tot)}</b></div>`});
  $('seats').innerHTML=h;
  $('board').innerHTML=[0,1,2,3,4].map(i=>st.board[i]?card(st.board[i]):'<div class="c e"></div>').join('');
- $('pot').innerHTML=coin+'البوت '+fmt(st.pot);$('msg').textContent=st.msg;
+ $('pot').hidden=true;$('msg').textContent=st.msg;
+ {const la=st.la,a=$('act');
+  if(!la||st.phase==='showdown'){a.classList.remove('on');lastSeq=0}
+  else if(la.seq!==lastSeq){lastSeq=la.seq;const T={call:['مساومة','#2f8a58'],raise:['رفع','#3a63c4'],allin:['كل شي','#c9971c'],check:['تمرير','#5a6280'],fold:['انسحاب','#a8283a']}[la.kind];
+   a.style.setProperty('--kc',T[1]);a.classList.remove('on');void a.offsetWidth;
+   a.innerHTML=`<div class="k">${T[0]}</div><div class="w">${esc(la.name)}${la.timeout?'<small>انتهى وقته</small>':''}</div>`+(la.kind==='fold'||la.kind==='check'?'':`<div class="m">${coin} ${fmt(la.amt)}</div>`);a.classList.add('on')}}
+ const sig=st.players.map(p=>p.hand.length).join()+st.rules+(me?JSON.stringify(me.hand):'')+st.players.filter(p=>p.in).length;
+ if(sig!==pSig&&st.phase==='preflop'){document.querySelectorAll('#seats .cd,#seats .c.b').forEach((e,i)=>{e.classList.add('fly');e.style.animationDelay=(i*60)+'ms'})}
+ if(st.phase==='preflop')pSig=sig;else if(st.phase==='lobby')pSig='';
+ if(st.board.length>pBoard)document.querySelectorAll('#board .cd').forEach((e,i)=>{if(i>=pBoard){e.classList.add('flip');e.style.animationDelay=((i-pBoard)*120)+'ms'}});
+ pBoard=st.board.length;
  $('rules').innerHTML=`تذكرة الدخول<div class="pill">${fmt(st.ticket)}${coin}</div>الفوز<div class="pill w">${fmt(st.win)}${coin}</div><span style="color:#cdbf94">طاولة ${st.code}</span>${st.rk&&st.rk.length?`<div style="color:#cdbf94;margin-top:3px;font-size:.72rem">الورق: ${st.rk.map(r=>R[r]||r).join(' ')}</div>`:''}`;
  $('hp').hidden=!st.mh;$('hp').firstChild&&0;$('hp').textContent=st.mh||'';
  mine=st.turn===st.me&&!!me;$('bar').className=mine?'on':'';

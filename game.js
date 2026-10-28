@@ -127,9 +127,15 @@ function createEngine(hooks = {}, timing = {}, config) {
 
   function view(r, me) {
     const sd = r.phase === 'showdown' && r.reveal;
+    // ترتيب الأقوى عند كشف الأوراق (١ = الأقوى، التعادل نفس الرقم)
+    const rankOf = new Map();
+    if (sd) {
+      const L = live(r).filter(p => p.score).sort((a, b) => cmp(b.score, a.score));
+      L.forEach((p, i) => rankOf.set(p, i > 0 && cmp(L[i - 1].score, p.score) === 0 ? rankOf.get(L[i - 1]) : i + 1));
+    }
     return {
       code: r.code, phase: r.phase, host: hostOf(r), by: (r.meta && r.meta.creatorName) || '', me: me.id, bb: r.bb,
-      ticket: r.ticket, win: r.win, board: r.board, cur: r.cur, minRaise: r.minRaise,
+      ticket: r.ticket, win: r.win, la: r.last || null, board: r.board, cur: r.cur, minRaise: r.minRaise,
       pot: r.players.reduce((s, p) => s + p.tot, 0),
       turn: r.players[r.turn] ? r.players[r.turn].id : undefined,
       left: r.paused ? 0 : Math.max(0, r.deadline - Date.now()), tt: T.turn, msg: r.paused ? '⏸ الطاولة متوقفة مؤقتاً من الإدارة' : r.msg,
@@ -137,10 +143,10 @@ function createEngine(hooks = {}, timing = {}, config) {
       players: r.players.map((p, i) => {
         const show = p === me || (sd && p.in && !p.folded);
         return {
-          id: p.id, name: p.name, chips: p.chips, bet: p.bet, folded: p.folded, allin: p.allin, in: p.in,
+          id: p.id, name: p.name, chips: p.chips, bet: p.bet, tot: p.tot, folded: p.folded, allin: p.allin, in: p.in,
           dealer: i === r.dealer, win: p.win || 0,
           hand: p.hand.length ? (show ? p.hand : [0, 0]) : [],
-          hn: (sd && p.in && !p.folded && p.score) ? HNs()[p.score[0]] : ''
+          hn: (sd && p.in && !p.folded && p.score) ? HNs()[p.score[0]] : '', rk: rankOf.get(p) || 0
         };
       })
     };
@@ -203,7 +209,7 @@ function createEngine(hooks = {}, timing = {}, config) {
     let k = cfg.deckByPlayers ? Math.min(cfg.maxRanks, Math.max(cfg.minRanks, n)) : cfg.maxRanks;
     while (4 * k < H * n + 5 && k < 13) k++;
     r.ranks = RANKS_ALL.slice(0, k);
-    r.deck = newDeck(r.ranks); r.board = []; r.msg = ''; r.reveal = false;
+    r.deck = newDeck(r.ranks); r.board = []; r.msg = ''; r.reveal = false; r.last = null;
     r.dealer = nxt(r, r.dealer, p => p.in);
     const sb = n === 2 ? r.dealer : nxt(r, r.dealer, p => p.in), bbI = nxt(r, sb, p => p.in);
     r.players.forEach(p => { if (p.in) p.hand = Array.from({ length: cfg.holeCards }, () => r.deck.pop()); });
@@ -217,7 +223,7 @@ function createEngine(hooks = {}, timing = {}, config) {
     const p = r.players[r.turn];
     r.deadline = Date.now() + T.turn;
     r.t = setTimeout(() => {
-      if (r.players[r.turn] === p) act0(r, p, 'fold'); // انتهى الوقت = يطلع من الجولة
+      if (r.players[r.turn] === p) act0(r, p, 'fold', 0, true); // انتهى الوقت = يطلع من الجولة
     }, p.left ? Math.min(400, T.turn) : T.turn + 200);
     send(r);
   }
@@ -238,7 +244,7 @@ function createEngine(hooks = {}, timing = {}, config) {
     r.turn = r.dealer; step(r);
   }
 
-  function act0(r, p, type, amt) {
+  function act0(r, p, type, amt, timeout) {
     if (r.paused || r.players[r.turn] !== p || !['preflop', 'flop', 'turn', 'river'].includes(r.phase)) return;
     const to = r.cur - p.bet;
     if (type === 'fold') p.folded = true;
@@ -260,6 +266,10 @@ function createEngine(hooks = {}, timing = {}, config) {
         r.players.forEach(o => { if (o !== p) o.acted = false; });
       }
     } else return;
+    // آخر حركة: تنعرض في النص الأعلى للكل
+    const paid = p.bet;
+    const kind = type === 'fold' ? 'fold' : p.allin ? 'allin' : type === 'raise' ? 'raise' : to > 0 ? 'call' : 'check';
+    r.last = { id: p.id, name: p.name, kind, amt: kind === 'call' ? Math.min(to, paid) : paid, timeout: !!timeout, seq: (r.seq = (r.seq || 0) + 1) };
     p.acted = true; step(r);
   }
 
@@ -455,7 +465,7 @@ function createEngine(hooks = {}, timing = {}, config) {
       const p = r.players[r.turn], ms = Math.max(1, Math.min(600, +sec || 10)) * 1000;
       clearTimeout(r.t);
       r.deadline = Date.now() + ms;
-      r.t = setTimeout(() => { if (r.players[r.turn] === p) act0(r, p, 'fold'); }, ms + 200);
+      r.t = setTimeout(() => { if (r.players[r.turn] === p) act0(r, p, 'fold', 0, true); }, ms + 200);
       send(r);
     },
     pause(r) {
